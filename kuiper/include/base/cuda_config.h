@@ -16,8 +16,8 @@ namespace kernel {
 // NoCopyable 不能拷贝，否则会多次调用析构函数，导致 double free
 class CudaConfig : public base::NoCopyable {
 public:
-    explicit CudaConfig() : stream_(nullptr) {} // 默认构造函数
-    explicit CudaConfig(cudaStream_t stream) : stream_(stream) {}
+    explicit CudaConfig() = default;
+    explicit CudaConfig(cudaStream_t stream);
     ~CudaConfig(); // 析构函数：自动销毁 CUDA 流，释放资源
     void create();
     cudaStream_t stream() const;

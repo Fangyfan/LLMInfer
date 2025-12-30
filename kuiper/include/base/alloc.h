@@ -5,7 +5,7 @@
 #include "base/base.h"
 
 namespace base {
-enum class MemcpyKind {
+enum class MemcpyKind : uint8_t {
     MemcpyCPU2CPU = 0,
     MemcpyCPU2CUDA = 1,
     MemcpyCUDA2CPU = 2,

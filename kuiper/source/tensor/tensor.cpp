@@ -8,7 +8,7 @@ static size_t reduce_dims(T begin, T end, U init_val) {
     if (begin >= end) {
         return 0;
     }
-    size_t size = accumulate(begin, end, init_val, std::multiplies<size_t>());
+    size_t size = std::accumulate(begin, end, init_val, std::multiplies<size_t>());
     return size;
 }
 
@@ -50,10 +50,8 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim
     init_buffer(allocator, need_alloc, ptr);
 }
 
-Tensor::Tensor(base::DataType data_type, std::vector<int32_t> dims, bool need_alloc, 
-               std::shared_ptr<base::DeviceAllocator> allocator, void* ptr)
-            : data_type_(data_type), dims_(std::move(dims))
-{
+Tensor::Tensor(base::DataType data_type, std::vector<int32_t> dims, bool need_alloc, std::shared_ptr<base::DeviceAllocator> allocator, void* ptr)
+: data_type_(data_type), dims_(std::move(dims)) {
     size_ = reduce_dims(dims_.begin(), dims_.end(), 1);
     init_buffer(allocator, need_alloc, ptr);
 }

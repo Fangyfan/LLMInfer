@@ -60,10 +60,10 @@ public:
     void set_device_type(base::DeviceType device_type);
 
 protected:
-    std::string layer_name_; // 层名
+    base::DeviceType device_type_ = base::DeviceType::DeviceUnknown; // 层设备类型
     LayerType layer_type_ = LayerType::LayerUnknown; // 层类型
     base::DataType data_type_ = base::DataType::DataTypeUnknown; // 层数据类型
-    base::DeviceType device_type_ = base::DeviceType::DeviceUnknown; // 层设备类型
+    std::string layer_name_; // 层名
 };
 
 // 不带参（权重）算子类
@@ -124,10 +124,10 @@ public:
     explicit LayerParam(base::DeviceType device_type, LayerType layer_type, bool is_quant_layer = false, std::string layer_name = "");
     
     // 获取权重的数量 weights_.size()
-    size_t weights_size() const;
+    size_t weight_size() const;
     
     // 重置权重的数量 weights_.size()
-    void reset_weights_size(size_t size);
+    void reset_weight_size(size_t size);
     
     // 通过索引获取权重，比如 Linear 层 get_weight(0) = W 且 get_weight(1) = b
     tensor::Tensor& get_weight(int32_t idx);
@@ -149,8 +149,8 @@ public:
     void to_cuda() override; // 重写 Layer 的 to_cuda 函数，把层的所有数据转移到 cuda
 
 protected:
-    int32_t group_size_ = 0;                // 分组量化：分组大小（默认 0 表示不分组）
     bool is_quant_layer_ = false;           // 标记是否是 量化层
+    int32_t group_size_ = 0;                // 分组量化：分组大小（默认 0 表示不分组）
     tensor::Tensor scales_;                 // 存储 缩放因子 的张量
     std::vector<tensor::Tensor> weights_;   // 算子中的所有权重（可能有多个，比如 Linear 层需要 2 个权重 W 和 b）
 };

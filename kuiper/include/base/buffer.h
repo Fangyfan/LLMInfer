@@ -33,6 +33,8 @@ public:
 private:
     // 这块内存的大小，以字节数作为单位
     size_t byte_size_ = 0;
+    // Buffer 对应设备类型的内存分配器，负责资源的释放、申请以及拷贝等，既可以是 cpu allocator 也可以是 cuda allocator
+    std::shared_ptr<DeviceAllocator> allocator_;
     // 这块内存的地址
     // 主要有两种来源，一种是外部直接赋值得到的，Buffer 不需要对它进行管理，和它的关系是借用，不负责它的生命周期管理，这种情况下 use_external = true。
     void* ptr_ = nullptr;
@@ -40,8 +42,6 @@ private:
     bool use_external_ = false;
     // Buffer 中内存资源所属的设备类型
     DeviceType device_type_ = DeviceType::DeviceUnknown;
-    // Buffer 对应设备类型的内存分配器，负责资源的释放、申请以及拷贝等，既可以是 cpu allocator 也可以是 cuda allocator
-    std::shared_ptr<DeviceAllocator> allocator_;
 };
 }  // namespace base
 

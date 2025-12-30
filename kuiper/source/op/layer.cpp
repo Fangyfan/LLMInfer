@@ -4,7 +4,7 @@
 
 namespace op {
 BaseLayer::BaseLayer(base::DeviceType device_type, LayerType layer_type, base::DataType data_type, std::string layer_name)
-    : device_type_(device_type), layer_type_(layer_type), data_type_(data_type), layer_name_(std::move(layer_name)) {}
+: device_type_(device_type), layer_type_(layer_type), data_type_(data_type), layer_name_(std::move(layer_name)) {}
 
 base::Status BaseLayer::set_weight(int32_t idx, const tensor::Tensor& weight) {
     return base::error::function_not_implement();
@@ -39,7 +39,7 @@ void BaseLayer::set_device_type(base::DeviceType device_type) {
 }
 
 Layer::Layer(base::DeviceType device_type, LayerType layer_type, std::string layer_name)
-    : BaseLayer(device_type, layer_type, base::DataType::DataTypeFp32, layer_name) {}
+: BaseLayer(device_type, layer_type, base::DataType::DataTypeFp32, layer_name) {}
 
 base::Status Layer::init() {
     return base::error::success();
@@ -222,11 +222,11 @@ void Layer::to_cuda() {
 LayerParam::LayerParam(base::DeviceType device_type, LayerType layer_type, bool is_quant_layer, std::string layer_name)
     : Layer(device_type, layer_type, std::move(layer_name)), is_quant_layer_(is_quant_layer) {}
 
-size_t LayerParam::weights_size() const {
+size_t LayerParam::weight_size() const {
     return weights_.size();
 }
 
-void LayerParam::reset_weights_size(size_t size) {
+void LayerParam::reset_weight_size(size_t size) {
     weights_.resize(size);
 }
 
@@ -302,4 +302,4 @@ void LayerParam::to_cuda() {
         scales_.to_cuda(cuda_config_ ? cuda_config_->stream() : nullptr);
     }
 }
-}
+}  // namespace op

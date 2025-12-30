@@ -10,6 +10,9 @@ namespace kernel {
 using AddKernel = void (*)(const tensor::Tensor& input1, const tensor::Tensor& input2, const tensor::Tensor& output, void* stream);
 AddKernel get_add_kernel(base::DeviceType device_type);
 
+using RMSNormKernel = void (*)(const tensor::Tensor& input, const tensor::Tensor& weight, const tensor::Tensor& output, void* stream);
+RMSNormKernel get_rmsnorm_kernel(base::DeviceType device_type);
+
 }  // namespace kernel
 
 #endif  // KERNEL_INTERFACE_H

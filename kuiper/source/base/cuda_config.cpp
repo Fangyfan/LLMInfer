@@ -1,6 +1,8 @@
 #include "base/cuda_config.h"
 
 namespace kernel {
+CudaConfig::CudaConfig(cudaStream_t stream) : stream_(stream) {}
+
 CudaConfig::~CudaConfig() {
     if (stream_) {
         cudaError_t err = cudaStreamDestroy(stream_);

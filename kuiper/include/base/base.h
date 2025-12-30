@@ -9,7 +9,7 @@
 #define UNUSED(expr) do { (void)(expr); } while (0)
 
 namespace model {
-enum class ModelBufferType {
+enum class ModelBufferType : uint8_t {
     InputTokens = 0,       // 输入 tokens
     InputEmbeddings = 1,   // 输入词嵌入
     OutputRMSNorm = 2,     // RMS 归一化输出
@@ -83,7 +83,7 @@ enum StatusCode : uint8_t {
     InvalidArgument = 7,       // 无效参数
 };
 
-enum class TokenizerType {
+enum class TokenizerType : int8_t {
     EncodeUnknown = -1,
     EncodeSpe = 0,     // SentencePiece 分词器
     EncodeBpe = 1,     // BPE 分词器
