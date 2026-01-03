@@ -204,6 +204,71 @@ TEST(test_tensor, init6) {
     ASSERT_EQ(*t_cpu.ptr<float>(), 31);
     ASSERT_EQ(*t_cpu.ptr<float>(0), 31);
     ASSERT_EQ(*t_cpu.ptr<float>(1), 32);
+    ASSERT_EQ(t_cpu.index<float>(1), 32);
+
+    t_cpu.to_cuda();
+    set_value_cu(t_cpu.ptr<float>(), t_cpu.size(), 2.f);
+    ASSERT_EQ(t_cpu.is_empty(), false);
+    ASSERT_EQ(t_cpu.get_dim(0), 32);
+    ASSERT_EQ(t_cpu.size(), 32);
+    ASSERT_EQ(t_cpu.dims(), std::vector<int32_t>({32}));
+    ASSERT_EQ(t_cpu.dims_size(), 1);
+    ASSERT_EQ(t_cpu.data_type(), DataType::DataTypeFp32);
+    ASSERT_EQ(t_cpu.strides(), std::vector<size_t>({1}));
+    ASSERT_EQ(t_cpu.device_type(), DeviceType::DeviceCUDA);
+    ASSERT_EQ(t_cpu.byte_size(), 32 * data_type_size(DataType::DataTypeFp32));
+
+    float* p2 = new float[32];
+    cudaMemcpy(p2, t_cpu.ptr<float>(), t_cpu.byte_size(), cudaMemcpyDeviceToHost);
+    for (int32_t i = 0; i < 32; i++) {
+        ASSERT_EQ(p2[i], 2.f);
+    }
+    delete[] p2;
+}
+
+TEST(test_tensor, init7) {
+    using namespace base;
+    float* ptr = new float[32];
+    ptr[0] = 31;
+    ptr[1] = 32;
+    tensor::Tensor t_cpu(base::DataType::DataTypeFp32, 32);
+    auto buffer = std::make_shared<base::Buffer>(t_cpu.byte_size(), nullptr, ptr, true);
+    buffer->set_device_type(DeviceType::DeviceCPU); // 当没有 allocator 来构造 buffer 时，需要手动设置 device_type
+    ASSERT_EQ(t_cpu.assgin(buffer), true); // 将 buffer 赋值给 t_cpu
+
+    ASSERT_EQ(t_cpu.is_empty(), false);
+    ASSERT_EQ(t_cpu.get_dim(0), 32);
+    ASSERT_EQ(t_cpu.size(), 32);
+    ASSERT_EQ(t_cpu.dims(), std::vector<int32_t>({32}));
+    ASSERT_EQ(t_cpu.dims_size(), 1);
+    ASSERT_EQ(t_cpu.data_type(), DataType::DataTypeFp32);
+    ASSERT_EQ(t_cpu.strides(), std::vector<size_t>({1}));
+    ASSERT_EQ(t_cpu.device_type(), DeviceType::DeviceCPU);
+    ASSERT_EQ(t_cpu.byte_size(), 32 * data_type_size(DataType::DataTypeFp32));
+    ASSERT_EQ(t_cpu.ptr<float>(), ptr);
+    ASSERT_EQ(*t_cpu.ptr<float>(), 31);
+    ASSERT_EQ(*t_cpu.ptr<float>(0), 31);
+    ASSERT_EQ(*t_cpu.ptr<float>(1), 32);
+    ASSERT_EQ(t_cpu.index<float>(1), 32);
+
+    t_cpu.to_cuda();
+    set_value_cu(t_cpu.ptr<float>(), t_cpu.size(), 2.f);
+    ASSERT_EQ(t_cpu.is_empty(), false);
+    ASSERT_EQ(t_cpu.get_dim(0), 32);
+    ASSERT_EQ(t_cpu.size(), 32);
+    ASSERT_EQ(t_cpu.dims(), std::vector<int32_t>({32}));
+    ASSERT_EQ(t_cpu.dims_size(), 1);
+    ASSERT_EQ(t_cpu.data_type(), DataType::DataTypeFp32);
+    ASSERT_EQ(t_cpu.strides(), std::vector<size_t>({1}));
+    ASSERT_EQ(t_cpu.device_type(), DeviceType::DeviceCUDA);
+    ASSERT_EQ(t_cpu.byte_size(), 32 * data_type_size(DataType::DataTypeFp32));
+
+    float* p2 = new float[32];
+    cudaMemcpy(p2, t_cpu.ptr<float>(), t_cpu.byte_size(), cudaMemcpyDeviceToHost);
+    for (int32_t i = 0; i < 32; i++) {
+        ASSERT_EQ(p2[i], 2.f);
+    }
+    delete[] p2;
 }
 
 // TEST(test_tensor, index) {
@@ -251,7 +316,7 @@ TEST(test_tensor, assign) {
     auto allocator_cpu = CPUDeviceAllocatorFactory::get_instance();
     tensor::Tensor t_cpu(DataType::DataTypeFp32, 32, 32, true, allocator_cpu);
     
-    size_t size = 32 * 32;
+    int32_t size = 32 * 32;
     float* ptr = new float[size];
     for (int32_t i = 0; i < size; i++) {
         ptr[i] = float(i);
@@ -259,8 +324,8 @@ TEST(test_tensor, assign) {
 
     auto buffer = std::make_shared<base::Buffer>(size * sizeof(float), nullptr, ptr, true);
     buffer->set_device_type(DeviceType::DeviceCPU); // 当没有 allocator 来构造 buffer 时，需要手动设置 device_type
+    ASSERT_EQ(t_cpu.assgin(buffer), true); // 将 buffer 赋值给 t_cpu
 
-    ASSERT_EQ(t_cpu.assgin(buffer), true);
     ASSERT_EQ(t_cpu.is_empty(), false);
     ASSERT_EQ(t_cpu.get_dim(0), 32);
     ASSERT_EQ(t_cpu.get_dim(1), 32);
@@ -271,6 +336,11 @@ TEST(test_tensor, assign) {
     ASSERT_EQ(t_cpu.strides(), std::vector<size_t>({32, 1}));
     ASSERT_EQ(t_cpu.device_type(), DeviceType::DeviceCPU);
     ASSERT_EQ(t_cpu.byte_size(), 32 * 32 * data_type_size(DataType::DataTypeFp32));
+    ASSERT_EQ(*t_cpu.ptr<float>(), 0.f);
+    ASSERT_EQ(*t_cpu.ptr<float>(0), 0.f);
+    ASSERT_EQ(*t_cpu.ptr<float>(1), 1.f);
+    ASSERT_EQ(*t_cpu.ptr<float>(2), 2.f);
+    ASSERT_EQ(t_cpu.index<float>(31), 31.f);
 
     delete[] ptr;
 }

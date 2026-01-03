@@ -39,8 +39,8 @@ public:
     virtual void set_input(int32_t idx, const tensor::Tensor& input) = 0; // 设置指定索引的输入张量
     virtual void set_output(int32_t idx, const tensor::Tensor& output) = 0; // 设置指定索引的输出张量
 
-    virtual size_t input_size() const = 0; // 获取输入张量的数量
-    virtual size_t output_size() const = 0; // 获取输出张量的数量
+    virtual size_t inputs_size() const = 0; // 获取输入张量的数量
+    virtual size_t outputs_size() const = 0; // 获取输出张量的数量
 
     virtual tensor::Tensor& get_input(int32_t idx) = 0; // 获取指定索引的输入张量
     virtual tensor::Tensor& get_output(int32_t idx) = 0; // 获取指定索引的输出张量
@@ -97,16 +97,16 @@ public:
     // set_output(0, y)
     void set_output(int32_t idx, const tensor::Tensor& output) override; // 设置指定索引的输出张量（传入输出）
 
-    size_t input_size() const override; // 获取输入张量的数量
-    size_t output_size() const override; // 获取输出张量的数量
+    size_t inputs_size() const override; // 获取输入张量的数量 inputs_.size()
+    size_t outputs_size() const override; // 获取输出张量的数量 outputs_.size()
 
     tensor::Tensor& get_input(int32_t idx) override; // 获取指定索引的输入张量
     tensor::Tensor& get_output(int32_t idx) override; // 获取指定索引的输出张量
     const tensor::Tensor& get_input(int32_t idx) const override;
     const tensor::Tensor& get_output(int32_t idx) const override;
 
-    void reset_input_size(size_t size); // 重置输入张量的数量
-    void reset_output_size(size_t size); // 重置输出张量的数量
+    void reset_inputs_size(size_t size); // 重置输入张量的数量 inputs_.size()
+    void reset_outputs_size(size_t size); // 重置输出张量的数量 outputs_.size()
 
     void set_cuda_config(std::shared_ptr<kernel::CudaConfig> cuda_config);
     std::shared_ptr<kernel::CudaConfig> cuda_config() const;
@@ -123,17 +123,14 @@ class LayerParam : public Layer {
 public:
     explicit LayerParam(base::DeviceType device_type, LayerType layer_type, bool is_quant_layer = false, std::string layer_name = "");
     
-    // 获取权重的数量 weights_.size()
-    size_t weight_size() const;
-    
-    // 重置权重的数量 weights_.size()
-    void reset_weight_size(size_t size);
+    size_t weights_size() const; // 获取权重的数量 weights_.size()
+    void reset_weights_size(size_t size); // 重置权重的数量 weights_.size()
     
     // 通过索引获取权重，比如 Linear 层 get_weight(0) = W 且 get_weight(1) = b
     tensor::Tensor& get_weight(int32_t idx);
     const tensor::Tensor& get_weight(int32_t idx) const;
     
-    // 直接设置指定索引的权重张量（存入weights_）
+    // 直接设置指定索引的权重张量（存入 weights_）
     // 用途：直接传入一个已初始化的张量作为权重（比如从其他层复用权重）
     base::Status set_weight(int32_t idx, const tensor::Tensor& weight) override;
     
@@ -144,14 +141,14 @@ public:
     
     void set_scales(const tensor::Tensor& scales);
     void set_group_size(int32_t group_size);
-    int32_t get_scale_num() const;
+    int32_t get_scales_size() const; // 获取 scales 张量的大小 (元素个数)
 
     void to_cuda() override; // 重写 Layer 的 to_cuda 函数，把层的所有数据转移到 cuda
 
 protected:
-    bool is_quant_layer_ = false;           // 标记是否是 量化层
-    int32_t group_size_ = 0;                // 分组量化：分组大小（默认 0 表示不分组）
-    tensor::Tensor scales_;                 // 存储 缩放因子 的张量
+    bool is_quant_layer_ = false;           // 标记是否为: 量化层
+    int32_t group_size_ = 0;                // 分组量化: 每次取连续的 group_size_ 个权重参数进行 Int8 对称量化，共享 1 个 scale 系数
+    tensor::Tensor scales_;                 // 缩放因子张量 (x_{fp32} = x_{int8} * scale) 
     std::vector<tensor::Tensor> weights_;   // 算子中的所有权重（可能有多个，比如 Linear 层需要 2 个权重 W 和 b）
 };
 }  // namespace op

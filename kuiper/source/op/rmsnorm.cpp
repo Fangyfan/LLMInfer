@@ -4,9 +4,9 @@
 namespace op {
 RMSNormLaryer::RMSNormLaryer(base::DeviceType device_type, int32_t dim)
 : LayerParam(device_type, LayerType::LayerRMSNorm, false, "RMSNorm"), dim_(dim) {
-    reset_input_size(1);
-    reset_output_size(1);
-    reset_weight_size(1);
+    reset_inputs_size(1);
+    reset_outputs_size(1);
+    reset_weights_size(1);
 }
 
 base::Status RMSNormLaryer::check() const {

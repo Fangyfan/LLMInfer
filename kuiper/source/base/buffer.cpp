@@ -4,7 +4,7 @@ namespace base {
 Buffer::Buffer(size_t byte_size, std::shared_ptr<DeviceAllocator> allocator, void* ptr, bool use_external)
 : byte_size_(byte_size), allocator_(allocator), ptr_(ptr), use_external_(use_external) {
     if (!ptr_ && allocator_) {
-        device_type_ = allocator_->device_type();
+        device_type_ = allocator_->device_type(); // 记得初始化 device_type_
         use_external_ = false;
         ptr_ = allocator_->allocate(byte_size_);
     }

@@ -3,8 +3,8 @@
 
 namespace op {
 VecAddLayer::VecAddLayer(base::DeviceType device_type) : Layer(device_type, LayerType::LayerAdd, "Add") {
-    reset_input_size(2);
-    reset_output_size(1);
+    reset_inputs_size(2);
+    reset_outputs_size(1);
 }
 
 base::Status VecAddLayer::check() const {

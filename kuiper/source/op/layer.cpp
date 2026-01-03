@@ -138,28 +138,20 @@ base::Status Layer::forward(const tensor::Tensor& input1, const tensor::Tensor& 
 void Layer::set_input(int32_t idx, const tensor::Tensor& input) {
     CHECK_GE(idx, 0);
     CHECK_LT(idx, inputs_.size());
-    CHECK(input.data_type() == data_type_);
-    if (!input.is_empty()) {
-        CHECK(input.device_type() == device_type_);
-    }
     inputs_.at(idx) = input;
 }
 
 void Layer::set_output(int32_t idx, const tensor::Tensor& output) {
     CHECK_GE(idx, 0);
     CHECK_LT(idx, outputs_.size());
-    CHECK(output.data_type() == data_type_);
-    if (!output.is_empty()) {
-        CHECK(output.device_type() == device_type_);
-    }
     outputs_.at(idx) = output;
 }
 
-size_t Layer::input_size() const {
+size_t Layer::inputs_size() const {
     return inputs_.size();
 }
 
-size_t Layer::output_size() const {
+size_t Layer::outputs_size() const {
     return outputs_.size();
 }
 
@@ -187,11 +179,11 @@ const tensor::Tensor& Layer::get_output(int32_t idx) const {
     return outputs_.at(idx);
 }
 
-void Layer::reset_input_size(size_t size) {
+void Layer::reset_inputs_size(size_t size) {
     inputs_.resize(size);
 }
 
-void Layer::reset_output_size(size_t size) {
+void Layer::reset_outputs_size(size_t size) {
     outputs_.resize(size);
 }
 
@@ -220,13 +212,13 @@ void Layer::to_cuda() {
 }
 
 LayerParam::LayerParam(base::DeviceType device_type, LayerType layer_type, bool is_quant_layer, std::string layer_name)
-    : Layer(device_type, layer_type, std::move(layer_name)), is_quant_layer_(is_quant_layer) {}
+: Layer(device_type, layer_type, std::move(layer_name)), is_quant_layer_(is_quant_layer) {}
 
-size_t LayerParam::weight_size() const {
+size_t LayerParam::weights_size() const {
     return weights_.size();
 }
 
-void LayerParam::reset_weight_size(size_t size) {
+void LayerParam::reset_weights_size(size_t size) {
     weights_.resize(size);
 }
 
@@ -257,19 +249,26 @@ base::Status LayerParam::set_weight(int32_t idx, const std::vector<int32_t>& dim
     CHECK_GE(idx, 0);
     CHECK_LT(idx, weights_.size());
     CHECK_NE(weight_ptr, nullptr);
-    
-    size_t data_size = base::data_type_size(base::DataType::DataTypeFp32);
-    size_t byte_size = std::accumulate(dims.begin(), dims.end(), data_size, std::multiplies<size_t>());
-    auto buffer = std::make_shared<base::Buffer>(byte_size, nullptr, const_cast<void*>(weight_ptr), true); // 使用外部内存/显存
-    if (device_type != base::DeviceType::DeviceUnknown) {
-        buffer->set_device_type(device_type);
-    }
 
     if (!is_quant_layer_) {
-        tensor::Tensor weight(base::DataType::DataTypeFp32, dims);
-        weight.set_device_type(device_type);
-        CHECK(weight.assgin(buffer));
+        // 创建 Fp32 类型的 Tensor 权重参数，同时创建 Buffer 使用 weight_ptr 所指向的外部内存/显存
+        tensor::Tensor weight(base::DataType::DataTypeFp32, dims, false, nullptr, const_cast<void*>(weight_ptr));
+        weight.set_device_type(device_type); // 当没有 allocator 来构造 buffer 时，需要手动设置 device_type
         weights_.at(idx) = weight;
+    } else {
+        // 创建 Int8 类型的 Tensor 权重参数，同时创建 Buffer 使用 weight_ptr 所指向的外部内存/显存
+        tensor::Tensor weight(base::DataType::DataTypeInt8, dims, false, nullptr, const_cast<void*>(weight_ptr));
+        weight.set_device_type(device_type); // 当没有 allocator 来构造 buffer 时，需要手动设置 device_type
+        weights_.at(idx) = weight;
+        
+        const int32_t weight_size = static_cast<int32_t>(weight.size());
+        CHECK(weight_size % group_size_ == 0);
+        int32_t scales_size = weight_size / group_size_; // 缩放因子 scales 张量的大小
+        float* scales_ptr = reinterpret_cast<float*>(reinterpret_cast<int8_t*>(const_cast<void*>(weight_ptr)) + weight_size);
+
+        // 创建 Fp32 类型的 Tensor 缩放因子，同时创建 Buffer 使用 scales_ptr 所指向的外部内存/显存
+        scales_ = tensor::Tensor(base::DataType::DataTypeFp32, scales_size, false, nullptr, scales_ptr);
+        scales_.set_device_type(device_type); // 当没有 allocator 来构造 buffer 时，需要手动设置 device_type
     }
 
     return base::error::success();
@@ -277,8 +276,7 @@ base::Status LayerParam::set_weight(int32_t idx, const std::vector<int32_t>& dim
 
 void LayerParam::set_scales(const tensor::Tensor& scales) {
     CHECK(!scales.is_empty());
-    CHECK(scales.data_type() == data_type_);
-    CHECK(scales.device_type() == device_type_);
+    CHECK(scales.data_type() == base::DataType::DataTypeFp32);
     scales_ = scales;
 }
 
@@ -286,7 +284,7 @@ void LayerParam::set_group_size(int32_t group_size) {
     group_size_ = group_size;
 }
 
-int32_t LayerParam::get_scale_num() const {
+int32_t LayerParam::get_scales_size() const {
     CHECK(!scales_.is_empty());
     return static_cast<int32_t>(scales_.size());
 }

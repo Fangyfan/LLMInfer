@@ -8,7 +8,7 @@ TEST(test_buffer, allocate) {
     using namespace base;
     auto allocator = CPUDeviceAllocatorFactory::get_instance();
     Buffer buffer(32, allocator);
-    LOG(INFO) << "buffer allocate ptr: " << buffer.ptr() << "\n";
+    // LOG(INFO) << "buffer allocate ptr: " << buffer.ptr() << "\n";
     ASSERT_NE(buffer.ptr(), nullptr);
     ASSERT_EQ(buffer.byte_size(), 32);
     ASSERT_EQ(buffer.is_external(), false);
@@ -19,7 +19,7 @@ TEST(test_buffer, allocate) {
 
     auto allocator_cu = CUDADeviceAllocatorFactory::get_instance();
     Buffer buffer_cu(32, allocator_cu);
-    LOG(INFO) << "buffer_cu allocate ptr: " << buffer_cu.ptr() << "\n";
+    // LOG(INFO) << "buffer_cu allocate ptr: " << buffer_cu.ptr() << "\n";
     ASSERT_NE(buffer_cu.ptr(), nullptr);
     ASSERT_EQ(buffer_cu.byte_size(), 32);
     ASSERT_EQ(buffer_cu.is_external(), false);
@@ -55,7 +55,7 @@ TEST(test_buffer, cuda_memory1) {
     buffer_cu.copy_from(buffer);
 
     float* ptr2 = new float[size];
-    LOG(INFO) << "copy buffer_cu.ptr() " << buffer_cu.ptr() << " to ptr2 " << ptr2 << ", byte_size = " << size * sizeof(float) << "\n";
+    // LOG(INFO) << "copy buffer_cu.ptr() " << buffer_cu.ptr() << " to ptr2 " << ptr2 << ", byte_size = " << size * sizeof(float) << "\n";
     allocator_cu->memcpy(ptr2, buffer_cu.ptr(), size * sizeof(float), MemcpyKind::MemcpyCUDA2CPU);
     // cudaMemcpy(ptr2, buffer_cu.ptr(), size * sizeof(float), cudaMemcpyDeviceToHost);
     for (int32_t i = 0; i < size; i++) {

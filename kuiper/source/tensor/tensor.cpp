@@ -58,8 +58,10 @@ Tensor::Tensor(base::DataType data_type, std::vector<int32_t> dims, bool need_al
 
 void Tensor::init_buffer(std::shared_ptr<base::DeviceAllocator> allocator, bool need_alloc, void* ptr) {
     if (!allocator) { // 如果 allocator 为空，表示该 tensor 不会对该内存/显存 ptr 进行管理
-        CHECK_NE(ptr, nullptr);
         CHECK_EQ(need_alloc, false);
+        if (!ptr) { // 当 ptr 为空时，不需要构造 buffer，此时应该通过外部 buffer 赋值(assign)进来
+            return;
+        }
         buffer_ = std::make_shared<base::Buffer>(byte_size(), nullptr, ptr, true);
     } else if (need_alloc) {
         allocate(allocator, false); // 如果存在合法的 buffer，则不需要 realloc
