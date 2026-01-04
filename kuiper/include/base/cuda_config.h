@@ -4,7 +4,7 @@
 // cuBLAS 库（CUDA 加速的线性代数库，矩阵/向量运算）
 // CUDA 运行时 API（核心 CUDA 操作，如流、内存管理）
 #include <cublas_v2.h>
-#include <cuda_runtime_api.h>
+#include <cuda_runtime.h>
 #include <glog/logging.h>
 #include "base/base.h"
 

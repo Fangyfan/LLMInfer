@@ -15,17 +15,17 @@ base::Status VecAddLayer::check() const {
     size_t size = input1.size();
     status = check_tensor_with_dim(input1, device_type_, data_type_, size);
     if (!status) {
-        LOG(ERROR) << "The input tensor 1 error in the add layer.\n";
+        LOG(ERROR) << "The input tensor 1 error in the add layer." << std::endl;
         return status;
     }
     status = check_tensor_with_dim(input2, device_type_, data_type_, size);
     if (!status) {
-        LOG(ERROR) << "The input tensor 2 error in the add layer.\n";
+        LOG(ERROR) << "The input tensor 2 error in the add layer." << std::endl;
         return status;
     }
     status = check_tensor_with_dim(output, device_type_, data_type_, size);
     if (!status) {
-        LOG(ERROR) << "The output tensor error in the add layer.\n";
+        LOG(ERROR) << "The output tensor error in the add layer." << std::endl;
         return status;
     }
     return base::error::success();

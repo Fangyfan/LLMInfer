@@ -125,7 +125,7 @@ void rmsnorm_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight
 
     if (size <= 1024) {
         constexpr int32_t thread_num = 128;
-        // LOG(INFO) << "size = " << size << ", " << "thread_num = " << thread_num << "\n";
+        // LOG(INFO) << "size = " << size << ", " << "thread_num = " << thread_num << std::endl;
         if (stream) {
             cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
             row_rmsnorm_fp32<thread_num><<<1, thread_num, 0, stream_>>>(in, wei, out, size, eps);
@@ -134,7 +134,7 @@ void rmsnorm_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight
         }
     } else {
         constexpr int32_t thread_num = 1024;
-        // LOG(INFO) << "size = " << size << ", " << "thread_num = " << thread_num << "\n";
+        // LOG(INFO) << "size = " << size << ", " << "thread_num = " << thread_num << std::endl;
         if (stream) {
             cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
             row_rmsnorm_fp32<thread_num><<<1, thread_num, 0, stream_>>>(in, wei, out, size, eps);

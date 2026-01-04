@@ -1,16 +1,14 @@
 #include "base/alloc.h"
-#include <cuda_runtime_api.h>
+#include <cuda_runtime.h>
 
 namespace base {
+DeviceAllocator::DeviceAllocator(DeviceType device_type) : device_type_(device_type) {}
 
-void DeviceAllocator::memcpy(
-    void* dest_ptr,           // 目标地址指针
-    const void* src_ptr,      // 源地址指针
-    size_t byte_size,         // 拷贝字节数
-    MemcpyKind memcpy_kind,   // 拷贝类型枚举
-    void* stream,             // CUDA 流（用于异步操作）
-    bool need_sync            // 是否需要同步等待
-) const {
+DeviceType DeviceAllocator::device_type() const {
+    return device_type_;
+}
+
+void DeviceAllocator::memcpy(void* dest_ptr, const void* src_ptr, size_t byte_size, MemcpyKind memcpy_kind, void* stream, bool need_sync) const {
     CHECK_NE(dest_ptr, nullptr);
     CHECK_NE(src_ptr, nullptr);
 
@@ -24,7 +22,7 @@ void DeviceAllocator::memcpy(
         // 将 void* 转换为 CUDA 流指针，操作是异步的，可以在不同流中并行执行多个拷贝/计算
         stream_ = static_cast<cudaStream_t>(stream);
     }
-
+    
     if (memcpy_kind == MemcpyKind::MemcpyCPU2CPU) {
         std::memcpy(dest_ptr, src_ptr, byte_size);
     } else if (memcpy_kind == MemcpyKind::MemcpyCPU2CUDA) {
@@ -46,7 +44,7 @@ void DeviceAllocator::memcpy(
             cudaMemcpyAsync(dest_ptr, src_ptr, byte_size, cudaMemcpyDeviceToDevice, stream_);
         }
     } else {
-        LOG(FATAL) << "Unknown memcpy kind: " << int(memcpy_kind);
+        LOG(FATAL) << "Unknown memcpy kind: " << int(memcpy_kind) << std::endl;
     }
 
     if (need_sync) {
@@ -56,15 +54,15 @@ void DeviceAllocator::memcpy(
 
 void DeviceAllocator::memset_zero(void* ptr, size_t byte_size, void* stream, bool need_sync) {
     CHECK(device_type_ != DeviceType::DeviceUnknown);
-
+    
     if (device_type_ == DeviceType::DeviceCPU) {
         std::memset(ptr, 0, byte_size);
     } else {
-        if (!stream) {
-            cudaMemset(ptr, 0, byte_size);
-        } else {
+        if (stream) {
             cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
             cudaMemsetAsync(ptr, 0, byte_size, stream_);
+        } else {
+            cudaMemset(ptr, 0, byte_size);
         }
     }
 

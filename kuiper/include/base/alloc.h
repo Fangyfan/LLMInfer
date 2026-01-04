@@ -1,6 +1,7 @@
 #ifndef KUIPER_INCLUDE_BASE_ALLOC_H
 #define KUIPER_INCLUDE_BASE_ALLOC_H
 
+#include <map>
 #include <memory>
 #include "base/base.h"
 
@@ -14,10 +15,10 @@ enum class MemcpyKind : uint8_t {
 
 class DeviceAllocator {
 public:
-    explicit DeviceAllocator(DeviceType device_type) : device_type_(device_type) {}
-    virtual DeviceType device_type() const { return device_type_; }
-    virtual void* allocate(size_t byte_size) const = 0;
-    virtual void release(void* ptr) const = 0;
+    explicit DeviceAllocator(DeviceType device_type);
+    virtual DeviceType device_type() const;
+    virtual void* allocate(size_t byte_size) = 0; // 要实现的内存分配接口
+    virtual void release(void* ptr) = 0; // 要实现的内存释放接口
     virtual void memcpy(void* dest_ptr, const void* src_ptr, size_t byte_size, MemcpyKind memcpy_kind = MemcpyKind::MemcpyCPU2CPU,
                         void* stream = nullptr, bool need_sync = false) const;
     virtual void memset_zero(void* ptr, size_t byte_size, void* stream, bool need_sync = false);
@@ -28,15 +29,27 @@ private:
 class CPUDeviceAllocator : public DeviceAllocator {
 public:
     explicit CPUDeviceAllocator();
-    void* allocate(size_t byte_size) const override;
-    void release(void* ptr) const override;
+    void* allocate(size_t byte_size) override;
+    void release(void* ptr) override;
+};
+
+struct CudaMemoryBuffer {
+    void* data;
+    size_t byte_size;
+    bool busy;
+    CudaMemoryBuffer() = default;
+    CudaMemoryBuffer(void* data, size_t byte_size, bool busy) : data(data), byte_size(byte_size), busy(busy) {}
 };
 
 class CUDADeviceAllocator : public DeviceAllocator {
 public:
     explicit CUDADeviceAllocator();
-    void* allocate(size_t byte_size) const override;
-    void release(void* ptr) const override;
+    void* allocate(size_t byte_size) override;
+    void release(void* ptr) override;
+private:
+    std::map<int32_t, size_t> no_busy_bytes_count_;
+    std::map<int32_t, std::vector<CudaMemoryBuffer>> big_buffers_map_;
+    std::map<int32_t, std::vector<CudaMemoryBuffer>> cuda_buffers_map_;
 };
 
 class CPUDeviceAllocatorFactory {

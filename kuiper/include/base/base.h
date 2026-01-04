@@ -118,7 +118,7 @@ namespace error {
         if (!status) {                                                                      \
             const size_t buf_size = 512;                                                    \
             char buf[buf_size];                                                             \
-            snprintf(buf, buf_size - 1,                                                     \
+            snprintf(buf, buf_size,                                                         \
                      "Infer error\n File: %s Line: %d\n Error code: %d\n Error msg: %s\n",  \
                      __FILE__, __LINE__, int(status), status.get_err_msg().c_str());        \
             LOG(FATAL) << buf;                                                              \

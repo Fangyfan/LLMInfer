@@ -84,7 +84,7 @@ TEST(test_op_add, add_cuda_align) {
     float* ptr = new float[size];
     cudaMemcpy(ptr, t_out.ptr<float>(), size * sizeof(float), cudaMemcpyDeviceToHost);
     for (int32_t i = 0; i < size; i++) {
-        ASSERT_NEAR(ptr[i], 5.4f, 0.0001f);
+        ASSERT_NEAR(ptr[i], 5.4f, 1e-5f);
     }
 
     delete[] ptr;

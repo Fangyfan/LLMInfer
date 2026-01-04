@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
     // 在将日志写入文件的同时，也输出到标准错误(stderr)，开发调试时方便查看控制台输出，生产环境通常设为 false，避免影响性能
     FLAGS_alsologtostderr = true;
     // 记录 INFO 级别的日志，输出程序开始执行的日志信息
-    LOG(INFO) << "Start Test...\n";
+    LOG(INFO) << "Start Test..." << std::endl;
     // 执行所有 TEST() 宏定义的测试用例，返回 0 所有测试通过，返回 1 有测试失败
     return RUN_ALL_TESTS();
 }

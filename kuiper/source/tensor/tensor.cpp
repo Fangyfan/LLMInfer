@@ -77,14 +77,14 @@ void Tensor::init_buffer(std::shared_ptr<base::DeviceAllocator> allocator, bool 
 bool Tensor::allocate(std::shared_ptr<base::DeviceAllocator> allocator, bool need_realloc) {
     // 排除 分配器为空
     if (!allocator) {
-        LOG(ERROR) << "The allocator parameter in the allocate function is null pointer!\n";
+        LOG(ERROR) << "The allocator parameter in the allocate function is null pointer!" << std::endl;
         return false;
     }
     
     // 排除 当前 Buffer 字节数为 0
     size_t byte_size_ = byte_size();
     if (!byte_size_) {
-        LOG(ERROR) << "The byte_size parameter in the allocate function is equal to zero!\n";
+        LOG(ERROR) << "The byte_size parameter in the allocate function is equal to zero!" << std::endl;
         return false;
     }
     
@@ -100,7 +100,7 @@ bool Tensor::allocate(std::shared_ptr<base::DeviceAllocator> allocator, bool nee
 
     // 判断内存是否分配成功
     if (!buffer_->ptr()) {
-        LOG(ERROR) << "The memory allocated is a null pointer!\n";
+        LOG(ERROR) << "The memory allocated is a null pointer!" << std::endl;
         return false;
     }
     return true;
@@ -109,18 +109,18 @@ bool Tensor::allocate(std::shared_ptr<base::DeviceAllocator> allocator, bool nee
 bool Tensor::assgin(std::shared_ptr<base::Buffer> buffer) {
     // 排除源 Buffer 为空
     if (!buffer) {
-        LOG(ERROR) << "The buffer parameter in the assign function is null pointer!\n";
+        LOG(ERROR) << "The buffer parameter in the assign function is null pointer!" << std::endl;
         return false;
     }
     if (buffer_) {
         // 目标 Buffer 与源 Buffer 设备类型不同
         if (buffer_->device_type() != buffer->device_type()) {
-            LOG(ERROR) << "The device type of the new buffer is different from the original one.\n";
+            LOG(ERROR) << "The device type of the new buffer is different from the original one." << std::endl;
         }
     }
     // 确保源 Buffer 字节数 >= 目标 Buffer 字节数
     if (buffer->byte_size() < byte_size()) {
-        LOG(ERROR) << "The size of buffer is too small for the tensor!\n";
+        LOG(ERROR) << "The size of buffer is too small for the tensor!" << std::endl;
         return false;
     }
     buffer_ = buffer;
@@ -129,7 +129,7 @@ bool Tensor::assgin(std::shared_ptr<base::Buffer> buffer) {
 
 void Tensor::to_cpu() {
     CHECK_NE(buffer_, nullptr);
-    base::DeviceType device_type_ = device_type();
+    const base::DeviceType device_type_ = device_type();
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         size_t byte_size_ = byte_size();
         auto allocator_cpu = base::CPUDeviceAllocatorFactory::get_instance();
@@ -137,25 +137,25 @@ void Tensor::to_cpu() {
         allocator_cpu->memcpy(buffer_cpu->ptr(), buffer_->ptr(), byte_size_, base::MemcpyKind::MemcpyCUDA2CPU);
         buffer_ = buffer_cpu;
     } else if (device_type_ == base::DeviceType::DeviceCPU) {
-        LOG(INFO) << "The device type of the tensor is already cpu.\n";
+        LOG(INFO) << "The device type of the tensor is already cpu." << std::endl;
     } else {
-        LOG(ERROR) << "The device type of the tensor is unknown.\n";
+        LOG(ERROR) << "The device type of the tensor is unknown." << std::endl;
     }
 }
 
 void Tensor::to_cuda(cudaStream_t stream) {
     CHECK_NE(buffer_, nullptr);
-    base::DeviceType device_type_ = device_type();
+    const base::DeviceType device_type_ = device_type();
     if (device_type_ == base::DeviceType::DeviceCPU) {
         size_t byte_size_ = byte_size();
         auto allocator_cu = base::CUDADeviceAllocatorFactory::get_instance();
         auto buffer_cu = std::make_shared<base::Buffer>(byte_size_, allocator_cu);
-        allocator_cu->memcpy(buffer_cu->ptr(), buffer_->ptr(), byte_size_, base::MemcpyKind::MemcpyCPU2CUDA);
+        allocator_cu->memcpy(buffer_cu->ptr(), buffer_->ptr(), byte_size_, base::MemcpyKind::MemcpyCPU2CUDA, stream);
         buffer_ = buffer_cu;
     } else if (device_type_ == base::DeviceType::DeviceCUDA) {
-        LOG(INFO) << "The device type of the tensor is already cuda.\n";
+        LOG(INFO) << "The device type of the tensor is already cuda." << std::endl;
     } else {
-        LOG(ERROR) << "The device type of the tensor is unknown.\n";
+        LOG(ERROR) << "The device type of the tensor is unknown." << std::endl;
     }
 }
 

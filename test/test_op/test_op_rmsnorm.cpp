@@ -18,8 +18,8 @@ TEST(test_op_rmsnorm, rmsnorm_cuda_no_stream) {
         input_cpu.index<float>(i) = dist(mt);
         weight_cpu.index<float>(i) = dist(mt);
     }
-    // LOG(INFO) << "input_cpu[" << 0 << "] = " << input_cpu.index<float>(0) << "\n";
-    // LOG(INFO) << "weight_cpu[" << 0 << "] = " << weight_cpu.index<float>(0) << "\n";
+    // LOG(INFO) << "input_cpu[" << 0 << "] = " << input_cpu.index<float>(0) << std::endl;
+    // LOG(INFO) << "weight_cpu[" << 0 << "] = " << weight_cpu.index<float>(0) << std::endl;
 
     tensor::Tensor input_cu = input_cpu.clone();
     tensor::Tensor weight_cu = weight_cpu.clone();

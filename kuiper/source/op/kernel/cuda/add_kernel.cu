@@ -45,6 +45,6 @@ void add_kernel_cu(const tensor::Tensor& input1, const tensor::Tensor& input2, c
     }
     // 核函数启动后不会立即报错，需手动检查 CUDA 错误
     cudaError_t err = cudaGetLastError();
-    CHECK(err == cudaSuccess) << "CUDA ADD kernel launch failed: " << cudaGetErrorString(err);
+    CHECK(err == cudaSuccess) << "CUDA ADD kernel launch failed: " << cudaGetErrorString(err) << std::endl;
 }
 }  // namespace kernel
