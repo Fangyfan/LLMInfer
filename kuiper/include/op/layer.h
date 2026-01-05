@@ -136,8 +136,7 @@ public:
     
     // 从原始内存指针加载权重（指定维度、数据指针、设备类型）
     // 用途：从模型文件加载权重，比如 从磁盘读取 权重数据 到内存指针 weight_ptr，指定张量维度 dims，就能直接 初始化 权重张量 并存入 weights_
-    base::Status set_weight(int32_t idx, const std::vector<int32_t>& dims, const void* weight_ptr, 
-                            base::DeviceType device_type = base::DeviceType::DeviceUnknown) override;
+    base::Status set_weight(int32_t idx, const std::vector<int32_t>& dims, const void* weight_ptr, base::DeviceType device_type) override;
     
     void set_scales(const tensor::Tensor& scales);
     void set_group_size(int32_t group_size);

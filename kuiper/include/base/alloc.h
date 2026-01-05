@@ -1,6 +1,7 @@
 #ifndef KUIPER_INCLUDE_BASE_ALLOC_H
 #define KUIPER_INCLUDE_BASE_ALLOC_H
 
+#include <set>
 #include <map>
 #include <memory>
 #include "base/base.h"
@@ -36,9 +37,12 @@ public:
 struct CudaMemoryBuffer {
     void* data;
     size_t byte_size;
-    bool busy;
     CudaMemoryBuffer() = default;
-    CudaMemoryBuffer(void* data, size_t byte_size, bool busy) : data(data), byte_size(byte_size), busy(busy) {}
+    CudaMemoryBuffer(void* data, size_t byte_size) : data(data), byte_size(byte_size) {}
+    bool operator<(const CudaMemoryBuffer& buffer) const {
+        if (byte_size == buffer.byte_size) return data < buffer.data;
+        return byte_size < buffer.byte_size;
+    }
 };
 
 class CUDADeviceAllocator : public DeviceAllocator {
@@ -47,9 +51,12 @@ public:
     void* allocate(size_t byte_size) override;
     void release(void* ptr) override;
 private:
+    std::map<void*, bool> data_is_big;
     std::map<int32_t, size_t> no_busy_bytes_count_;
-    std::map<int32_t, std::vector<CudaMemoryBuffer>> big_buffers_map_;
-    std::map<int32_t, std::vector<CudaMemoryBuffer>> cuda_buffers_map_;
+    std::map<int32_t, std::set<CudaMemoryBuffer>> big_busy_buffers_map_;
+    std::map<int32_t, std::set<CudaMemoryBuffer>> big_no_busy_buffers_map_;
+    std::map<int32_t, std::set<CudaMemoryBuffer>> cuda_busy_buffers_map_;
+    std::map<int32_t, std::set<CudaMemoryBuffer>> cuda_no_busy_buffers_map_;
 };
 
 class CPUDeviceAllocatorFactory {

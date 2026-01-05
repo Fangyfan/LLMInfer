@@ -296,7 +296,7 @@ void LayerParam::to_cuda() {
             weight.to_cuda(cuda_config_ ? cuda_config_->stream() : nullptr);
         }
     }
-    if (!scales_.is_empty()) {
+    if (is_quant_layer_ && !scales_.is_empty()) {
         scales_.to_cuda(cuda_config_ ? cuda_config_->stream() : nullptr);
     }
 }

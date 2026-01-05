@@ -33,9 +33,9 @@ base::Status RMSNormLaryer::forward() {
     if (!status) {
         return status;
     }
-    tensor::Tensor& input = get_input(0);
-    tensor::Tensor& weight = get_weight(0);
-    tensor::Tensor& output = get_output(0);
+    const tensor::Tensor& input = get_input(0);
+    const tensor::Tensor& weight = get_weight(0);
+    const tensor::Tensor& output = get_output(0);
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         CHECK_NE(cuda_config_, nullptr);
     }

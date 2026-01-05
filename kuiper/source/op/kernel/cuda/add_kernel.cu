@@ -10,13 +10,12 @@ static __global__ void add_kernel_fp32(const int32_t size, const float* in1, con
 }
 
 void add_kernel_cu(const tensor::Tensor& input1, const tensor::Tensor& input2, const tensor::Tensor& output, void* stream) {
+    CHECK(!input1.is_empty());
+    CHECK(!input2.is_empty());
+    CHECK(!output.is_empty());
     CHECK(input1.device_type() == base::DeviceType::DeviceCUDA);
     CHECK(input2.device_type() == base::DeviceType::DeviceCUDA);
     CHECK(output.device_type() == base::DeviceType::DeviceCUDA);
-
-    CHECK_EQ(input1.is_empty(), false);
-    CHECK_EQ(input2.is_empty(), false);
-    CHECK_EQ(output.is_empty(), false);
 
     int32_t size = static_cast<int32_t>(output.size());
     CHECK_EQ(input1.size(), size);

@@ -112,7 +112,6 @@ void rmsnorm_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight
     CHECK(!input.is_empty());
     CHECK(!weight.is_empty());
     CHECK(!output.is_empty());
-
     CHECK(input.device_type() == base::DeviceType::DeviceCUDA);
     CHECK(weight.device_type() == base::DeviceType::DeviceCUDA);
     CHECK(output.device_type() == base::DeviceType::DeviceCUDA);
@@ -122,12 +121,16 @@ void rmsnorm_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight
     float* out = const_cast<float*>(output.ptr<float>());
     const int32_t size = static_cast<int32_t>(input.size());
     constexpr float eps = 1e-5f;
+    
+    cudaStream_t stream_ = nullptr;
+    if (stream) {
+        stream_ = static_cast<cudaStream_t>(stream);
+    }
 
     if (size <= 1024) {
         constexpr int32_t thread_num = 128;
         // LOG(INFO) << "size = " << size << ", " << "thread_num = " << thread_num << std::endl;
-        if (stream) {
-            cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
+        if (stream_) {
             row_rmsnorm_fp32<thread_num><<<1, thread_num, 0, stream_>>>(in, wei, out, size, eps);
         } else {
             row_rmsnorm_fp32<thread_num><<<1, thread_num>>>(in, wei, out, size, eps);
@@ -135,8 +138,7 @@ void rmsnorm_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight
     } else {
         constexpr int32_t thread_num = 1024;
         // LOG(INFO) << "size = " << size << ", " << "thread_num = " << thread_num << std::endl;
-        if (stream) {
-            cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
+        if (stream_) {
             row_rmsnorm_fp32<thread_num><<<1, thread_num, 0, stream_>>>(in, wei, out, size, eps);
         } else {
             row_rmsnorm_fp32<thread_num><<<1, thread_num>>>(in, wei, out, size, eps);

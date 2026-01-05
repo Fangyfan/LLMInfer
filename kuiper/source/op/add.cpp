@@ -36,9 +36,9 @@ base::Status VecAddLayer::forward() {
     if (!status) {
         return status;
     }
-    tensor::Tensor& input1 = get_input(0);
-    tensor::Tensor& input2 = get_input(1);
-    tensor::Tensor& output = get_output(0);
+    const tensor::Tensor& input1 = get_input(0);
+    const tensor::Tensor& input2 = get_input(1);
+    const tensor::Tensor& output = get_output(0);
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         CHECK_NE(cuda_config_, nullptr);
     }
