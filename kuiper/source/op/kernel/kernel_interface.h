@@ -35,11 +35,28 @@ using MatmulKernelQuant = void (*)(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 
     const tensor::Tensor& output, 
-    const tensor::Tensor& sacles, 
+    const tensor::Tensor& scales, 
     int32_t group_size, 
     void* stream
 );
 MatmulKernelQuant get_matmul_kernel_quant8(base::DeviceType device_type);
+
+using SwigluKernel = void (*)(
+    const tensor::Tensor& input1, 
+    const tensor::Tensor& input2, 
+    const tensor::Tensor& output, 
+    void* stream
+);
+SwigluKernel get_swiglu_kernel(base::DeviceType device_type);
+
+using EmbeddingKernel = void (*)(
+    const tensor::Tensor& input, 
+    const tensor::Tensor& weight, 
+    const tensor::Tensor& output, 
+    int32_t vocab_size, 
+    void* stream
+);
+EmbeddingKernel get_embedding_kernel(base::DeviceType device_type);
 
 }  // namespace kernel
 

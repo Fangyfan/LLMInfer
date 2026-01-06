@@ -18,11 +18,6 @@ base::Status MatmulLayer::check() const {
         LOG(ERROR) << "The input tensor error in the matmul layer." << std::endl;
         return status;
     }
-    status = check_tensor_with_dim(get_output(0), device_type_, data_type_, dim0_);
-    if (!status) {
-        LOG(ERROR) << "The output tensor error in the matmul layer." << std::endl;
-        return status;
-    }
     if (!is_quant_layer_) {
         status = check_tensor_with_dim(get_weight(0), device_type_, data_type_, dim0_, dim1_);
         if (!status) {
@@ -38,6 +33,18 @@ base::Status MatmulLayer::check() const {
         status = check_tensor_with_dim(scales_, device_type_, base::DataType::DataTypeFp32, scales_.size());
         if (!status) {
             LOG(ERROR) << "The scales tensor error in the matmul layer." << std::endl;
+            return status;
+        }
+    }
+    status = check_tensor_with_dim(get_output(0), device_type_, data_type_, dim0_);
+    if (!status) {
+        LOG(ERROR) << "The output tensor error in the matmul layer." << std::endl;
+        return status;
+    }
+    if (has_bias_) {
+        status = check_tensor_with_dim(get_bias(0), device_type_, data_type_, dim0_);
+        if (!status) {
+            LOG(ERROR) << "The bias tensor error in the matmul layer." << std::endl;
             return status;
         }
     }

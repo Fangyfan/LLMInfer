@@ -2,7 +2,6 @@
 #define KUIPER_INLCUDE_MHA_H
 
 #include "op/layer.h"
-#include "base/cuda_config.h"
 
 namespace op {
 

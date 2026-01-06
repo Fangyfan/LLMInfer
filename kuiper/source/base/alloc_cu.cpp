@@ -9,84 +9,72 @@ void* CUDADeviceAllocator::allocate(size_t byte_size) {
         return nullptr;
     }
 
-    CHECK(cudaSetDevice(3) == cudaSuccess);
-
-    // 获取当前正在使用的 GPU 设备 ID
-    int32_t cuda_id = -1;
-    cudaError_t err = cudaGetDevice(&cuda_id);
-    CHECK(err == cudaSuccess);
+    // 确保在单卡上面分配显存，当前正在使用的 GPU 设备 ID
+    CHECK(cudaSetDevice(cuda_id_) == cudaSuccess);
     
+    // int32_t cuda_id = -1;
+    // CHECK(cudaGetDevice(&cuda_id) == cudaSuccess);
+    // LOG(INFO) << "cuda_id = " << cuda_id << std::endl;
+
     // 判断本次申请的是 大块显存 (> 1MB)
     constexpr size_t mbytes = 1024 * 1024;
     if (byte_size > mbytes) {
-        auto& no_busy_buffers = big_no_busy_buffers_map_[cuda_id]; // 获取当前 GPU 的大块显存池
-        
-        // 找到了符合条件的空闲块 (查找最小的 >= byte_size 的空闲块)
-        auto it = no_busy_buffers.lower_bound(CudaMemoryBuffer(nullptr, byte_size));
-        if (it != no_busy_buffers.end() && it->byte_size - byte_size < mbytes) {
-            // 修改显存块为使用状态
-            CudaMemoryBuffer buffer = *it;
-            no_busy_buffers.erase(it);
-            big_busy_buffers_map_[cuda_id].insert(buffer);
-            CHECK(buffer.byte_size >= byte_size);
-            // LOG(INFO) << "allocate: big reuse cuda" << cuda_id << " , ptr = " << buffer.data << " , bytes = " << byte_size << std::endl;
-            return buffer.data; // 复用显存地址
+        // 找到了符合条件的空闲块 (查找最小的 >= byte_size 的空闲块，且富余空间 < 1MB)
+        auto it = big_no_busy_buffers_.lower_bound(CudaMemoryBuffer(nullptr, byte_size));
+        if (it != big_no_busy_buffers_.end() && it->byte_size - byte_size < mbytes) {
+            void* data = it->data;
+            auto pos = big_busy_buffers_.insert(*it).first; // 修改显存块为使用状态
+            data_iter_[data].second = pos; // 更新 busy 显存块地址 data 与迭代器 pos 的映射关系
+            big_no_busy_buffers_.erase(it);
+            // LOG(INFO) << "allocate: big reuse cuda" << cuda_id_ << " , ptr = " << data << " , bytes = " << byte_size << std::endl;
+            return data; // 复用显存地址
         }
 
         // 遍历完大块显存池，没找到合适的空闲块，只能调用 cudaMalloc 申请新显存
         void* data = nullptr;
-        err = cudaMalloc(&data, byte_size);
-        
-        // 申请失败：打印错误日志，返回空指针
-        if (err != cudaSuccess) {
+        if (cudaMalloc(&data, byte_size) != cudaSuccess) { // 申请失败：打印错误日志，返回空指针
             char buf[256];
             snprintf(buf, sizeof(buf), 
                     "Error: CUDA error when allocating %lu MB memory! maybe there's no enough memory left on device %d.", 
-                    byte_size / mbytes, cuda_id);
+                    byte_size / mbytes, cuda_id_);
             LOG(ERROR) << buf << std::endl;
             return nullptr;
         }
 
         // 申请成功：把这个新显存块加入到大块显存池里，标记为 busy = true（刚申请就被占用）
-        // LOG(INFO) << "allocate: big malloc cuda" << cuda_id << " , ptr = " << data << " , bytes = " << byte_size << std::endl;
-        big_busy_buffers_map_[cuda_id].emplace(data, byte_size);
-        data_is_big[data] = true;
+        // LOG(INFO) << "allocate: big malloc cuda" << cuda_id_ << " , ptr = " << data << " , bytes = " << byte_size << std::endl;
+        auto pos = big_busy_buffers_.emplace(data, byte_size).first;
+        data_iter_[data] = {true, pos};
         return data;
     }
 
-    auto& no_busy_buffers = cuda_no_busy_buffers_map_[cuda_id]; // 获取当前 GPU 的小块显存池
-
     // 找到了符合条件的空闲块 (查找最小的 >= byte_size 的空闲块)
-    auto it = no_busy_buffers.lower_bound(CudaMemoryBuffer(nullptr, byte_size));
-    if (it != no_busy_buffers.end()) {
-        // 修改显存块为使用状态
-        CudaMemoryBuffer buffer = *it;
-        no_busy_buffers.erase(it);
-        no_busy_bytes_count_[cuda_id] -= buffer.byte_size; // 更新小块的空闲显存
-        cuda_busy_buffers_map_[cuda_id].insert(buffer);
-        CHECK(buffer.byte_size >= byte_size);
-        // LOG(INFO) << "allocate: small reuse cuda" << cuda_id << " , ptr = " << buffer.data << " , bytes = " << byte_size << std::endl;
-        return buffer.data; // 复用显存地址
+    auto it = cuda_no_busy_buffers_.lower_bound(CudaMemoryBuffer(nullptr, byte_size));
+    if (it != cuda_no_busy_buffers_.end()) {
+        void* data = it->data;
+        auto pos = cuda_busy_buffers_.insert(*it).first; // 修改显存块为使用状态
+        data_iter_[data].second = pos; // 更新 busy 显存块中 data 指针与 pos 迭代器的映射关系
+        no_busy_bytes_count_ -= it->byte_size; // 更新小块的空闲显存
+        cuda_no_busy_buffers_.erase(it);
+        // LOG(INFO) << "allocate: small reuse cuda" << cuda_id_ << " , ptr = " << data << " , bytes = " << byte_size << std::endl;
+        return data; // 复用显存地址
     }
 
     // 遍历完小块显存池，没找到合适的空闲块，只能调用 cudaMalloc 申请新显存
     void* data = nullptr;
-    err = cudaMalloc(&data, byte_size);
-
-     // 申请失败：打印错误日志，返回空指针
-    if (err != cudaSuccess) {
+    if (cudaMalloc(&data, byte_size) != cudaSuccess) { // 申请失败：打印错误日志，返回空指针
         char buf[256];
         snprintf(buf, sizeof(buf), 
                 "Error: CUDA error when allocating %lu B memory! maybe there's no enough memory left on device %d.", 
-                byte_size, cuda_id);
+                byte_size, cuda_id_);
         LOG(ERROR) << buf << std::endl;
         return nullptr;
     }
 
     // 申请成功：把这个新显存块加入到小块显存池里，标记为 busy = true（刚申请就被占用）
-    // LOG(INFO) << "allocate: small malloc cuda" << cuda_id << " , ptr = " << data << " , bytes = " << byte_size << std::endl;
-    cuda_busy_buffers_map_[cuda_id].emplace(data, byte_size);
-    data_is_big[data] = false;
+    // LOG(INFO) << "allocate: small malloc cuda" << cuda_id_ << " , ptr = " << data << " , bytes = " << byte_size << std::endl;
+    auto pos = cuda_busy_buffers_.emplace(data, byte_size).first;
+    data_iter_[data] = {false, pos};
     return data;
 }
 
@@ -95,56 +83,37 @@ void CUDADeviceAllocator::release(void* ptr) {
         return;
     }
     
-    CHECK(data_is_big.count(ptr));
+    auto iter = data_iter_.find(ptr);
+    CHECK(iter != data_iter_.end());
+    auto [data_is_big, it] = iter->second; // 找到要释放的显存指针对应的显存块迭代器 it
 
-    if (data_is_big[ptr]) {
-        // 遍历所有 GPU 的大块显存池
-        for (auto& [cuda_id, busy_buffers] : big_busy_buffers_map_) {
-            for (auto it = busy_buffers.begin(); it != busy_buffers.end(); it++) {
-                if (it->data == ptr) { // 找到要释放的显存指针对应的显存块
-                    big_busy_buffers_map_[cuda_id].insert(*it);
-                    busy_buffers.erase(it);
-                    // LOG(INFO) << "release: big reuse cuda" << cuda_id << " , ptr = " << ptr << std::endl;
-                    return;
-                }
-            }
-        }
+    if (data_is_big) {
+        big_no_busy_buffers_.insert(*it);
+        big_busy_buffers_.erase(it);
+        // LOG(INFO) << "released: big reuse cuda" << cuda_id_ << " , ptr = " << ptr << std::endl;
+        return;
     } else {
-        // 遍历所有 GPU 的小块显存池
+        cuda_no_busy_buffers_.insert(*it); // 标记为空闲，完成释放
+        no_busy_bytes_count_ += it->byte_size; // 更新小块的空闲显存
+        cuda_busy_buffers_.erase(it);
+        // LOG(INFO) << "released: small reuse cuda" << cuda_id_ << " , ptr = " << ptr << std::endl;
         constexpr size_t gbytes = 1024 * 1024 * 1024;
-        for (auto& [cuda_id, busy_buffers] : cuda_busy_buffers_map_) {
-            for (auto it = busy_buffers.begin(); it != busy_buffers.end(); it++) {
-                if (it->data == ptr) { // 找到要释放的显存指针对应的显存块
-                    auto& no_busy_buffers = cuda_no_busy_buffers_map_[cuda_id];
-                    no_busy_bytes_count_[cuda_id] += it->byte_size; // 更新小块的空闲显存
-                    no_busy_buffers.insert(*it); // 标记为空闲，完成释放
-                    busy_buffers.erase(it);
-                    if (no_busy_bytes_count_[cuda_id] > gbytes) { // 当前 GPU 的小块空闲显存 > 1GB
-                        cudaError_t err = cudaSetDevice(cuda_id); // 切换到对应 GPU
-                        CHECK(err == cudaSuccess) << "Error: CUDA error when set device " << cuda_id << std::endl;
-                        for (auto& buffer : no_busy_buffers) {
-                            data_is_big.erase(buffer.data);
-                            err = cudaFree(buffer.data); // 调用 cudaFree 释放空闲显存
-                            CHECK(err == cudaSuccess) << "Error: CUDA error when release memory on device " << cuda_id << std::endl;
-                        }
-                        no_busy_buffers.clear(); // 清空小块空闲显存池
-                        no_busy_bytes_count_[cuda_id] = 0; // 小块的空闲显存清零
-                    }
-                    // LOG(INFO) << "release: small reuse cuda" << cuda_id << " , ptr = " << ptr << std::endl;
-                    return;
-                }
+        if (no_busy_bytes_count_ > gbytes) { // 当前 GPU 的小块空闲显存 > 1024MB
+            // LOG(INFO) << "released: free all small blocks cuda" << cuda_id_ << std::endl;
+            for (auto& buffer : cuda_no_busy_buffers_) {
+                data_iter_.erase(buffer.data);
+                cudaError_t err = cudaFree(buffer.data); // 调用 cudaFree 释放空闲显存
+                CHECK(err == cudaSuccess) << "Error: CUDA error when release memory on device " << cuda_id_ << std::endl;
             }
+            cuda_no_busy_buffers_.clear(); // 清空小块空闲显存池
+            no_busy_bytes_count_ = 0; // 小块的空闲显存清零
         }
+        return;
     }
 
-    // // 获取当前正在使用的 GPU 设备 ID
-    // int32_t cuda_id = -1;
-    // cudaError_t err1 = cudaGetDevice(&cuda_id);
-    // CHECK(err1 == cudaSuccess);
-    // LOG(INFO) << "release: free cuda" << cuda_id << " , ptr = " << ptr << std::endl;
-
     // 如果不是池子里的显存，调用 cudaFree
-    data_is_big.erase(ptr);
+    // LOG(INFO) << "released: free cuda" << cuda_id_ << " , ptr = " << ptr << std::endl;
+    data_iter_.erase(ptr);
     cudaError_t err = cudaFree(ptr);
     CHECK(err == cudaSuccess) << "Error: CUDA error when release memory on device" << std::endl;
 }

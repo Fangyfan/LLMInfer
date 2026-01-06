@@ -39,7 +39,7 @@ struct CudaMemoryBuffer {
     size_t byte_size;
     CudaMemoryBuffer() = default;
     CudaMemoryBuffer(void* data, size_t byte_size) : data(data), byte_size(byte_size) {}
-    bool operator<(const CudaMemoryBuffer& buffer) const {
+    bool operator < (const CudaMemoryBuffer& buffer) const {
         if (byte_size == buffer.byte_size) return data < buffer.data;
         return byte_size < buffer.byte_size;
     }
@@ -51,12 +51,13 @@ public:
     void* allocate(size_t byte_size) override;
     void release(void* ptr) override;
 private:
-    std::map<void*, bool> data_is_big;
-    std::map<int32_t, size_t> no_busy_bytes_count_;
-    std::map<int32_t, std::set<CudaMemoryBuffer>> big_busy_buffers_map_;
-    std::map<int32_t, std::set<CudaMemoryBuffer>> big_no_busy_buffers_map_;
-    std::map<int32_t, std::set<CudaMemoryBuffer>> cuda_busy_buffers_map_;
-    std::map<int32_t, std::set<CudaMemoryBuffer>> cuda_no_busy_buffers_map_;
+    const int32_t cuda_id_ = 3; // 确保在单卡上面分配显存，当前正在使用的 GPU 设备 ID
+    size_t no_busy_bytes_count_ = 0; // 记录 空闲的 显存小块 大小之和
+    std::set<CudaMemoryBuffer> big_busy_buffers_;
+    std::set<CudaMemoryBuffer> big_no_busy_buffers_;
+    std::set<CudaMemoryBuffer> cuda_busy_buffers_;
+    std::set<CudaMemoryBuffer> cuda_no_busy_buffers_;
+    std::map<void*, std::pair<bool, std::set<CudaMemoryBuffer>::iterator>> data_iter_; // 记录 busy 显存块 ptr -> iter 映射关系
 };
 
 class CPUDeviceAllocatorFactory {

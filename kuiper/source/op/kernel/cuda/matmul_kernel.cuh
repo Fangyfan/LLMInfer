@@ -15,7 +15,7 @@ void matmul_kernel_cu_quant8(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 
     const tensor::Tensor& output, 
-    const tensor::Tensor& sacles, 
+    const tensor::Tensor& scales, 
     int32_t group_size, 
     void* stream
 );

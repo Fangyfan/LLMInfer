@@ -12,7 +12,7 @@ base::Status VecAddLayer::check() const {
     const tensor::Tensor& input1 = get_input(0);
     const tensor::Tensor& input2 = get_input(1);
     const tensor::Tensor& output = get_output(0);
-    size_t size = input1.size();
+    const int32_t size = static_cast<int32_t>(input1.size());
     status = check_tensor_with_dim(input1, device_type_, data_type_, size);
     if (!status) {
         LOG(ERROR) << "The input tensor 1 error in the add layer." << std::endl;

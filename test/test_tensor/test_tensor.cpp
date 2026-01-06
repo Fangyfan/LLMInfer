@@ -147,24 +147,6 @@ TEST(test_tensor, init3) {
     ASSERT_EQ(t_cu.byte_size(), 12 * 22 * 32 * data_type_size(DataType::DataTypeFp32));
 }
 
-TEST(test_tensor, init4) {
-    using namespace base;
-    auto allocator_cu = CUDADeviceAllocatorFactory::get_instance();
-    tensor::Tensor t_cu(DataType::DataTypeFp32, 12, 22, 32, 42, true, allocator_cu);
-    ASSERT_EQ(t_cu.is_empty(), false);
-    ASSERT_EQ(t_cu.get_dim(0), 12);
-    ASSERT_EQ(t_cu.get_dim(1), 22);
-    ASSERT_EQ(t_cu.get_dim(2), 32);
-    ASSERT_EQ(t_cu.get_dim(3), 42);
-    ASSERT_EQ(t_cu.size(), 12 * 22 * 32 * 42);
-    ASSERT_EQ(t_cu.dims(), std::vector<int32_t>({12, 22, 32, 42}));
-    ASSERT_EQ(t_cu.dims_size(), 4);
-    ASSERT_EQ(t_cu.data_type(), DataType::DataTypeFp32);
-    ASSERT_EQ(t_cu.strides(), std::vector<size_t>({22 * 32 * 42, 32 * 42, 42, 1}));
-    ASSERT_EQ(t_cu.device_type(), DeviceType::DeviceCUDA);
-    ASSERT_EQ(t_cu.byte_size(), 12 * 22 * 32 * 42 * data_type_size(DataType::DataTypeFp32));
-}
-
 TEST(test_tensor, init5) {
     using namespace base;
     auto allocator_cu = CUDADeviceAllocatorFactory::get_instance();
@@ -182,6 +164,24 @@ TEST(test_tensor, init5) {
     ASSERT_EQ(t_cu.strides(), std::vector<size_t>({22 * 32 * 42 * 52, 32 * 42 * 52, 42 * 52, 52, 1}));
     ASSERT_EQ(t_cu.device_type(), DeviceType::DeviceCUDA);
     ASSERT_EQ(t_cu.byte_size(), 12 * 22 * 32 * 42 * 52 * data_type_size(DataType::DataTypeFp32));
+}
+
+TEST(test_tensor, init4) {
+    using namespace base;
+    auto allocator_cu = CUDADeviceAllocatorFactory::get_instance();
+    tensor::Tensor t_cu(DataType::DataTypeFp32, 12, 22, 32, 42, true, allocator_cu);
+    ASSERT_EQ(t_cu.is_empty(), false);
+    ASSERT_EQ(t_cu.get_dim(0), 12);
+    ASSERT_EQ(t_cu.get_dim(1), 22);
+    ASSERT_EQ(t_cu.get_dim(2), 32);
+    ASSERT_EQ(t_cu.get_dim(3), 42);
+    ASSERT_EQ(t_cu.size(), 12 * 22 * 32 * 42);
+    ASSERT_EQ(t_cu.dims(), std::vector<int32_t>({12, 22, 32, 42}));
+    ASSERT_EQ(t_cu.dims_size(), 4);
+    ASSERT_EQ(t_cu.data_type(), DataType::DataTypeFp32);
+    ASSERT_EQ(t_cu.strides(), std::vector<size_t>({22 * 32 * 42, 32 * 42, 42, 1}));
+    ASSERT_EQ(t_cu.device_type(), DeviceType::DeviceCUDA);
+    ASSERT_EQ(t_cu.byte_size(), 12 * 22 * 32 * 42 * data_type_size(DataType::DataTypeFp32));
 }
 
 TEST(test_tensor, init6) {
