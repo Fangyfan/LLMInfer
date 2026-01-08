@@ -6,10 +6,10 @@
 
 namespace op {
 enum class LayerType : uint8_t {
-    LayerUnknown = 0,   // 未知层（默认值）
-    LayerLinear = 1,    // 线性层（全连接层）
-    LayerEncode = 2,    // 编码层
-    LayerEmbedding = 3, // 嵌入层
+    LayerUnknown = 0,   // 未知层 (默认值)
+    LayerLinear = 1,    // 线性层 (全连接层)
+    LayerEncode = 2,    // 编码层 (Tokenizer层: string <=> token ids)
+    LayerEmbedding = 3, // 嵌入层 (token ids => word embedding)
     LayerRMSNorm = 4,   // RMS归一化层
     LayerMatmul = 5,    // 矩阵乘法层
     LayerRoPE = 6,      // RoPE位置编码层

@@ -19,15 +19,15 @@ enum class ModelBufferType : uint8_t {
     InputPos = 6,          // 输入位置信息
     ScoreStorage = 7,      // 注意力分数存储
     OutputMHA = 8,         // 多头注意力输出
-    AttnOutput = 9,        // 注意力输出
+    AttentionOutput = 9,   // 注意力输出
     W1Output = 10,         // 前馈网络第一层输出
     W2Output = 11,         // 前馈网络第二层输出
     W3Output = 12,         // 前馈网络第三层输出
     FFNRMSNorm = 13,       // FFN 的 RMS 归一化
-    ForwardOutput = 15,    // 前向传播输出
-    ForwardOutputCPU = 16, // CPU 上的前向传播输出
-    SinCache = 17,         // 正弦位置编码缓存
-    CosCache = 18,         // 余弦位置编码缓存
+    ForwardOutput = 14,    // 前向传播输出
+    ForwardOutputCPU = 15, // CPU 上的前向传播输出
+    SinCache = 16,         // 正弦位置编码缓存
+    CosCache = 17,         // 余弦位置编码缓存
 };
 }  // namespace model
 
@@ -58,7 +58,7 @@ inline size_t data_type_size(DataType data_type) {
     } else if (data_type == DataType::DataTypeInt32) {
         return sizeof(int32_t);
     } else {
-        LOG(FATAL) << "Unknown data type size for " << int(data_type);
+        LOG(FATAL) << "Unknown data type size for " << int(data_type) << std::endl;
         return 0;
     }
 }
@@ -73,7 +73,7 @@ protected:
 };
 
 // 统一的错误码系统
-enum StatusCode : uint8_t {
+enum class StatusCode : uint8_t {
     Success = 0,               // 成功
     FunctionUnImplement = 1,   // 功能未实现
     PathNotValid = 2,          // 路径无效
@@ -85,25 +85,25 @@ enum StatusCode : uint8_t {
 
 enum class TokenizerType : int8_t {
     EncodeUnknown = -1,
-    EncodeSpe = 0,     // SentencePiece 分词器
-    EncodeBpe = 1,     // BPE 分词器
+    EncodeSpe = 0,      // SentencePiece 分词器
+    EncodeBpe = 1,      // BPE 分词器
 };
 
 class Status {
 public:
-    Status(int code = StatusCode::Success, std::string err_msg = "");
+    Status(StatusCode code = StatusCode::Success, std::string err_msg = "");
     Status(const Status& other) = default;
     Status& operator=(const Status& other) = default;
-    Status& operator=(int code);
-    bool operator==(int code) const;
-    bool operator!=(int code) const;
+    Status& operator=(StatusCode code);
+    bool operator==(StatusCode code) const;
+    bool operator!=(StatusCode code) const;
     operator int() const;
     operator bool() const;
-    int get_err_code() const;
+    StatusCode get_err_code() const;
     const std::string& get_err_msg() const;
     void set_err_msg(const std::string& err_msg);
 private:
-    int code_ = StatusCode::Success;
+    StatusCode code_ = StatusCode::Success;
     std::string err_msg_;
 };
 

@@ -3,8 +3,8 @@
 
 namespace op {
 MultiHeadAttention::MultiHeadAttention(base::DeviceType device_type, int32_t layer_index, int32_t pos, int32_t kv_mul, int32_t kv_dim, 
-int32_t seq_len, int32_t head_num, int32_t head_size) : Layer(device_type, LayerType::LayerMHA, "MHA"), layer_index_(layer_index), 
-pos_(pos), kv_mul_(kv_mul), kv_dim_(kv_dim), seq_len_(seq_len), head_num_(head_num), head_size_(head_size) {
+int32_t seq_len, int32_t head_num, int32_t head_size) : Layer(device_type, LayerType::LayerMHA, "MHA"), 
+layer_index_(layer_index), pos_(pos), kv_mul_(kv_mul), kv_dim_(kv_dim), seq_len_(seq_len), head_num_(head_num), head_size_(head_size) {
     reset_inputs_size(4);
     reset_outputs_size(1);
 }

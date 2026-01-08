@@ -2,30 +2,30 @@
 
 namespace base {
 
-Status::Status(int code, std::string err_msg) : code_(code), err_msg_(err_msg) {}
+Status::Status(StatusCode code, std::string err_msg) : code_(code), err_msg_(err_msg) {}
 
-Status& Status::operator=(int code) {
+Status& Status::operator=(StatusCode code) {
     code_ = code;
     return *this;
 }
 
-bool Status::operator==(int code) const {
+bool Status::operator==(StatusCode code) const {
     return code_ == code;
 }
 
-bool Status::operator!=(int code) const {
+bool Status::operator!=(StatusCode code) const {
     return code_ != code;
 }
 
 Status::operator int() const {
-    return code_;
+    return int(code_);
 }
 
 Status::operator bool() const {
     return code_ == StatusCode::Success;
 }
 
-int Status::get_err_code() const {
+StatusCode Status::get_err_code() const {
     return code_;
 }
 

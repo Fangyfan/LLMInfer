@@ -7,6 +7,9 @@
 #include "cpu/embedding_kernel.h"
 #include "cpu/rope_kernel.h"
 #include "cpu/mha_kernel.h"
+#include "cpu/softmax_kernel.h"
+#include "cpu/scale_kernel.h"
+#include "cpu/scale_sum_kernel.h"
 
 #include "cuda/add_kernel.cuh"
 #include "cuda/rmsnorm_kernel.cuh"
@@ -15,6 +18,7 @@
 #include "cuda/embedding_kernel.cuh"
 #include "cuda/rope_kernel.cuh"
 #include "cuda/mha_kernel.cuh"
+#include "cuda/argmax_kernel.cuh"
 
 namespace kernel {
 AddKernel get_add_kernel(base::DeviceType device_type) {
@@ -99,6 +103,33 @@ MHAKernel get_mha_kernel(base::DeviceType device_type) {
         return mha_kernel_cu;
     } else {
         LOG(FATAL) << "Unknown device type for get a mha kernel." << std::endl;
+        return nullptr;
+    }
+}
+
+SoftmaxKernel get_softmax_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCPU) {
+        return softmax_kernel_cpu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a softmax kernel." << std::endl;
+        return nullptr;
+    }
+}
+
+ScaleKernel get_scale_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCPU) {
+        return scale_kernel_cpu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a scale kernel." << std::endl;
+        return nullptr;
+    }
+}
+
+ScaleSumKernel get_scale_sum_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCPU) {
+        return scale_sum_kernel_cpu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a scale sum kernel." << std::endl;
         return nullptr;
     }
 }

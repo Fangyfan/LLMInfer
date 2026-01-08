@@ -88,6 +88,22 @@ using MHAKernel = void (*)(
 );
 MHAKernel get_mha_kernel(base::DeviceType device_type);
 
+using SoftmaxKernel = void (*)(const tensor::Tensor& input);
+SoftmaxKernel get_softmax_kernel(base::DeviceType device_type);
+
+using ScaleKernel = void (*)(float scale, const tensor::Tensor& input);
+ScaleKernel get_scale_kernel(base::DeviceType device_type);
+
+using ScaleSumKernel = void (*)(
+    const tensor::Tensor& score, 
+    const tensor::Tensor& value, 
+    const tensor::Tensor& output, 
+    int32_t pos, 
+    int32_t head_size, 
+    int32_t kv_dim
+);
+ScaleSumKernel get_scale_sum_kernel(base::DeviceType device_type);
+
 }  // namespace kernel
 
 #endif  // KERNEL_INTERFACE_H
