@@ -11,21 +11,27 @@ EmbeddingLayer::EmbeddingLayer(base::DeviceType device_type, int32_t dim, int32_
 
 base::Status EmbeddingLayer::check() const {
     base::Status status;
-    const tensor::Tensor& input = get_input(0); // 输入 tokens，每个 token 是离散的 id，在 [0, vocab_size) 范围内
-    int32_t token_num = static_cast<int32_t>(get_input(1).size()); // 输入 token 的数量
-    status = check_tensor_with_dim(input, base::DeviceType::DeviceCPU, base::DataType::DataTypeInt32, token_num);
+    status = check_tensor_with_dim(get_input(1), base::DeviceType::DeviceCPU, base::DataType::DataTypeInt32, 1);
     if (!status) {
-        LOG(ERROR) << "The input tensor error in the embedding layer.";
+        LOG(ERROR) << "The input token number error in the embedding layer." << std::endl;
+        return status;
+    }
+    // 当前的输入 token 的数量，注意 prefill 阶段 token_num = seq_len，decode 阶段 token_num = 1
+    int32_t token_num = get_input(1).index<int32_t>(0);
+    // 输入 tokens，每个 token ids 值是离散的，在 [0, vocab_size) 范围内
+    status = check_tensor_with_dim(get_input(0), base::DeviceType::DeviceCPU, base::DataType::DataTypeInt32, token_num);
+    if (!status) {
+        LOG(ERROR) << "The input tensor error in the embedding layer." << std::endl;
         return status;
     }
     status = check_tensor_with_dim(get_weight(0), device_type_, data_type_, vocab_size_, dim_);
     if (!status) {
-        LOG(ERROR) << "The weight tensor error in the embedding layer.";
+        LOG(ERROR) << "The weight tensor error in the embedding layer." << std::endl;
         return status;
     }
     status = check_tensor_with_dim(get_output(0), device_type_, data_type_, token_num, dim_);
     if (!status) {
-        LOG(ERROR) << "The output tensor error in the embedding layer.";
+        LOG(ERROR) << "The output tensor error in the embedding layer." << std::endl;
         return status;
     }
     return base::error::success();

@@ -1,14 +1,20 @@
 #include "kernel_interface.h"
+
 #include "cpu/add_kernel.h"
 #include "cpu/rmsnorm_kernel.h"
 #include "cpu/matmul_kernel.h"
 #include "cpu/swiglu_kernel.h"
 #include "cpu/embedding_kernel.h"
+#include "cpu/rope_kernel.h"
+#include "cpu/mha_kernel.h"
+
 #include "cuda/add_kernel.cuh"
 #include "cuda/rmsnorm_kernel.cuh"
 #include "cuda/matmul_kernel.cuh"
 #include "cuda/swiglu_kernel.cuh"
 #include "cuda/embedding_kernel.cuh"
+#include "cuda/rope_kernel.cuh"
+#include "cuda/mha_kernel.cuh"
 
 namespace kernel {
 AddKernel get_add_kernel(base::DeviceType device_type) {
@@ -71,6 +77,28 @@ EmbeddingKernel get_embedding_kernel(base::DeviceType device_type) {
         return embedding_kernel_cu;
     } else {
         LOG(FATAL) << "Unknown device type for get a embedding kernel." << std::endl;
+        return nullptr;
+    }
+}
+
+RoPEKernel get_rope_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCPU) {
+        return rope_kernel_cpu;
+    } else if (device_type == base::DeviceType::DeviceCUDA) {
+        return rope_kernel_cu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a rope kernel." << std::endl;
+        return nullptr;
+    }
+}
+
+MHAKernel get_mha_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCPU) {
+        return mha_kernel_cpu;
+    } else if (device_type == base::DeviceType::DeviceCUDA) {
+        return mha_kernel_cu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a mha kernel." << std::endl;
         return nullptr;
     }
 }

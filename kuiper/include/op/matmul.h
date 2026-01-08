@@ -4,8 +4,8 @@
 #include "op/layer.h"
 
 namespace op {
-// 输入: 输入向量 x (dim1)，权重矩阵 w (dim0, dim1)，偏置 b (dim0)
-// 输出: 输出向量 y (dim0)
+// 输入: 向量 x (dim1)，权重矩阵 w (dim0, dim1)，偏置 b (dim0)
+// 输出: 向量 y (dim0)
 // 计算公式为: 矩阵-向量乘法 y = wx + b
 class MatmulLayer : public LayerParam {
 public:
@@ -24,10 +24,10 @@ public:
     void to_cuda() override;
 
 private:
-    int32_t dim0_ = 0; // 权重矩阵 w 的第 1 个维度
-    int32_t dim1_ = 0; // 权重矩阵 w 的第 2 个维度
-    bool has_bias_ = false; // 当前层是否有偏置 bias
-    std::vector<tensor::Tensor> bias_; // 偏置张量 bias
+    int32_t dim0_ = 0;                  // 权重矩阵 w 的第 1 个维度
+    int32_t dim1_ = 0;                  // 权重矩阵 w 的第 2 个维度
+    bool has_bias_ = false;             // 当前层是否有偏置 bias
+    std::vector<tensor::Tensor> bias_;  // 偏置张量 bias
 };
 }  // namespace op
 

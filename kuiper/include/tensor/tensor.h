@@ -103,13 +103,13 @@ const T* Tensor::ptr() const {
 
 template<typename T>
 T* Tensor::ptr(int64_t index) {
-    CHECK(buffer_ && buffer_->ptr()) << "The data area buffer of this tensor is empty or it points to a null pointer.";
+    CHECK(buffer_ && buffer_->ptr()) << "The data area buffer of this tensor is empty or it points to a null pointer." << std::endl;
     return reinterpret_cast<T*>(buffer_->ptr()) + index;
 }
 
 template<typename T>
 const T* Tensor::ptr(int64_t index) const {
-    CHECK(buffer_ && buffer_->ptr()) << "The data area buffer of this tensor is empty or it points to a null pointer.";
+    CHECK(buffer_ && buffer_->ptr()) << "The data area buffer of this tensor is empty or it points to a null pointer." << std::endl;
     return reinterpret_cast<const T*>(buffer_->ptr()) + index;
 }
 

@@ -12,7 +12,7 @@ enum class LayerType : uint8_t {
     LayerEmbedding = 3, // 嵌入层
     LayerRMSNorm = 4,   // RMS归一化层
     LayerMatmul = 5,    // 矩阵乘法层
-    LayerRope = 6,      // RoPE位置编码层
+    LayerRoPE = 6,      // RoPE位置编码层
     LayerMHA = 7,       // 多头注意力层
     LayerSoftmax = 8,   // Softmax层
     LayerAdd = 9,       // 加法层

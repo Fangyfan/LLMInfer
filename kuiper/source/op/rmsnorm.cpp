@@ -10,17 +10,21 @@ RMSNormLaryer::RMSNormLaryer(base::DeviceType device_type, int32_t dim)
 }
 
 base::Status RMSNormLaryer::check() const {
-    base::Status status = check_tensor_with_dim(get_input(0), device_type_, data_type_, dim_);
+    base::Status status;
+    const tensor::Tensor& input = get_input(0); // 输入向量
+    const tensor::Tensor& weight = get_weight(0); // 可学习的缩放因子
+    const tensor::Tensor& output = get_output(0); // 输出均方根归一化向量
+    status = check_tensor_with_dim(input, device_type_, data_type_, dim_);
     if (!status) {
         LOG(ERROR) << "The input tensor error in the rmsnorm layer." << std::endl;
         return status;
     }
-    status = check_tensor_with_dim(get_weight(0), device_type_, data_type_, dim_);
+    status = check_tensor_with_dim(weight, device_type_, data_type_, dim_);
     if (!status) {
         LOG(ERROR) << "The weight tensor error in the rmsnorm layer." << std::endl;
         return status;
     }
-    status = check_tensor_with_dim(get_output(0), device_type_, data_type_, dim_);
+    status = check_tensor_with_dim(output, device_type_, data_type_, dim_);
     if (!status) {
         LOG(ERROR) << "The output tensor error in the rmsnorm layer." << std::endl;
         return status;
