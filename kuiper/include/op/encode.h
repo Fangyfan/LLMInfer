@@ -7,7 +7,7 @@
 namespace op {
 class BaseEncodeLayer : public Layer { // 接口层（抽象基类），解耦 tokenizer 的具体实现，允许未来支持 SentencePiece / SPE
 public:
-    explicit BaseEncodeLayer(std::string token_model_path, bool has_bos, bool has_eos);
+    explicit BaseEncodeLayer(std::string tokenizer_path, bool has_bos, bool has_eos);
 
     // 文本(sentence) -> token ids
     virtual std::vector<int32_t> encode(const std::string& sentence) const = 0;
@@ -25,14 +25,14 @@ public:
     
 protected:
     // 这些是所有 tokenizer 都共用的配置
-    std::string token_model_path_;  // SentencePiece 模型文件路径 (.model)
-    bool has_bos_ = false;          // 是否在开头插入 <bos>
-    bool has_eos_ = false;          // 是否在结尾插入 <eos>
+    std::string tokenizer_path_;  // SentencePiece 模型文件路径 (.model)
+    bool has_bos_ = false;  // 是否在开头插入 <bos>
+    bool has_eos_ = false;  // 是否在结尾插入 <eos>
 };
 
 class SpeEncodeLayer : public BaseEncodeLayer {
 public:
-    explicit SpeEncodeLayer(std::string token_model_path, bool has_bos, bool has_eos); // 构造函数：加载 tokenizer 模型
+    explicit SpeEncodeLayer(std::string tokenizer_path, bool has_bos, bool has_eos); // 构造函数：加载 tokenizer 模型
     virtual std::vector<int32_t> encode(const std::string& sentence) const override;
     virtual std::string decode(int32_t token_id) const override;
     virtual std::string decode(const std::vector<int32_t>& token_ids) const override;

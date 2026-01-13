@@ -2,17 +2,17 @@
 #include "kernel/kernel_interface.h"
 
 namespace op {
-BaseEncodeLayer::BaseEncodeLayer(std::string token_model_path, bool has_bos, bool has_eos)
+BaseEncodeLayer::BaseEncodeLayer(std::string tokenizer_path, bool has_bos, bool has_eos)
 : Layer(base::DeviceType::DeviceCPU, LayerType::LayerEncode, "Encode"), 
-  token_model_path_(std::move(token_model_path)), has_bos_(has_bos), has_eos_(has_eos) {}
+  tokenizer_path_(std::move(tokenizer_path)), has_bos_(has_bos), has_eos_(has_eos) {}
 
 
-SpeEncodeLayer::SpeEncodeLayer(std::string token_model_path, bool has_bos, bool has_eos)
-: BaseEncodeLayer(std::move(token_model_path), has_bos, has_eos) {
+SpeEncodeLayer::SpeEncodeLayer(std::string tokenizer_path, bool has_bos, bool has_eos)
+: BaseEncodeLayer(std::move(tokenizer_path), has_bos, has_eos) {
     // 创建 processor
     spe_ = std::make_unique<sentencepiece::SentencePieceProcessor>();
     // 加载模型
-    sentencepiece::util::Status status = spe_->Load(token_model_path_);
+    sentencepiece::util::Status status = spe_->Load(tokenizer_path_);
     // 校验是否成功，失败直接终止程序（不是异常，是 fatal error）
     if (status.code() != sentencepiece::util::StatusCode::kOk) {
         LOG(FATAL) << "The token model path is not valid, please check the path and type of token model." << std::endl;

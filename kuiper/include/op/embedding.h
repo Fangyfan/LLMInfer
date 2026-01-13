@@ -4,12 +4,22 @@
 #include "op/layer.h"
 
 namespace op {
+// prompt 阶段: prompt sentence 中所有 tokens 的 embeddings
+// generate 阶段: new token 的 embedding
+struct EmbeddingResult {
+    tensor::Tensor token_ids;
+    tensor::Tensor token_embeddings;
+    tensor::Tensor token_num;
+    explicit EmbeddingResult(tensor::Tensor token_ids, tensor::Tensor token_embeddings, tensor::Tensor token_num)
+    : token_ids(std::move(token_ids)), token_embeddings(std::move(token_embeddings)), token_num(std::move(token_num)) {}
+};
+
 // 输入: 向量 in 表示 tokens_seq (seq_len)，in[i] 属于 [0, vocab_size)，词嵌入张量 weight (vocab_size, dim)
 // 输出: 张量 out (seq_len, dim)
 // 计算公式: out = Embedding(in, weight) = weight[in[i]]
 class EmbeddingLayer : public LayerParam {
 public:
-    EmbeddingLayer(base::DeviceType device_type, int32_t dim, int32_t seq_len, int32_t vocab_size);
+    explicit EmbeddingLayer(base::DeviceType device_type, int32_t dim, int32_t seq_len, int32_t vocab_size);
 
     base::Status check() const override;
 

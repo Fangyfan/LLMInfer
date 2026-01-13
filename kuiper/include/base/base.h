@@ -46,8 +46,8 @@ enum class DataType : uint8_t {
 };
 
 enum class ModelType : uint8_t {
-    ModelTypeUnown = 0,
-    ModelTypeLLama2 = 1,
+    ModelTypeUnknown = 0,
+    ModelTypeLlama2 = 1,
 };
 
 inline size_t data_type_size(DataType data_type) {
