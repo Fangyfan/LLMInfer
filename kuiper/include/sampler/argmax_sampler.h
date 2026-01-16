@@ -12,7 +12,7 @@ public:
     // 输入 logits = [-0.2, 2.3, 0.5, 1.8, -1.0]，输出为索引 1
     // logits: 模型输出的原始分数数组（未经过 softmax）
     // size: 数组大小，即词汇表大小
-    size_t sample(const float* logits, size_t size, void* stream) const override;
+    int32_t sample(const float* logits, int32_t size, void* stream) const override;
 };
 }  // namespace sampler
 

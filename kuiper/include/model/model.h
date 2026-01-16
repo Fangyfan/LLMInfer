@@ -36,7 +36,7 @@ public:
     virtual std::vector<int32_t> encode(const std::string& sentence) const;
 
     virtual std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_id, int32_t token_pos) const;
-    virtual tensor::Tensor fill_input(const tensor::Tensor& token_pos, const op::EmbeddingResult& embedding_output, bool is_prompt) const;
+    virtual tensor::Tensor get_embedding(const tensor::Tensor& token_pos, const op::EmbeddingResult& embedding_output, bool is_prompt) const;
 
 protected:
     virtual base::Status insert_buffer(ModelBufferType model_buffer_type, const tensor::Tensor& model_buffer);
@@ -47,7 +47,7 @@ protected:
     virtual int32_t post_process(bool is_prompt) const = 0;
 
 private:
-    virtual void init_mem() = 0;
+    virtual void allocate_model_buffers() = 0;
     // 这些函数负责在程序启动时读取文件并创建对象
     virtual base::Status create_layers() = 0; // 总入口
     virtual void create_param_layers() = 0; // 创建带权重的层（Linear 层等）

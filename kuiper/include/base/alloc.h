@@ -51,7 +51,7 @@ public:
     void* allocate(size_t byte_size) override;
     void release(void* ptr) override;
 private:
-    const int32_t cuda_id_ = 3; // 确保在单卡上面分配显存，当前正在使用的 GPU 设备 ID
+    const int32_t cuda_id_ = 0; // 确保在单卡上面分配显存，当前正在使用的 GPU 设备 ID
     size_t no_busy_bytes_count_ = 0; // 记录 空闲的 显存小块 大小之和
     std::set<CudaMemoryBuffer> big_busy_buffers_;
     std::set<CudaMemoryBuffer> big_no_busy_buffers_;

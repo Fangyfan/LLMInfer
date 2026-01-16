@@ -2,12 +2,12 @@
 #include "kernel/kernel_interface.h"
 
 namespace op {
-VecAddLayer::VecAddLayer(base::DeviceType device_type) : Layer(device_type, LayerType::LayerAdd, "Add") {
+AddLayer::AddLayer(base::DeviceType device_type) : Layer(device_type, LayerType::LayerAdd, "Add") {
     reset_inputs_size(2);
     reset_outputs_size(1);
 }
 
-base::Status VecAddLayer::check() const {
+base::Status AddLayer::check() const {
     base::Status status;
     const tensor::Tensor& input1 = get_input(0);
     const tensor::Tensor& input2 = get_input(1);
@@ -31,7 +31,7 @@ base::Status VecAddLayer::check() const {
     return base::error::success();
 }
 
-base::Status VecAddLayer::forward() {
+base::Status AddLayer::forward() {
     base::Status status = check();
     if (!status) {
         return status;
@@ -42,7 +42,7 @@ base::Status VecAddLayer::forward() {
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         CHECK_NE(cuda_config_, nullptr);
     }
-    kernel::get_add_kernel(device_type_)(input1, input2, output, cuda_config_ ? cuda_config_->stream() : nullptr);
+    kernel::get_add_kernel(device_type_)(input1, input2, output, cuda_config_ ? cuda_config_->stream : nullptr);
     return base::error::success();
 }
 }  // namespace op

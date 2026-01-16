@@ -9,8 +9,8 @@ void* CUDADeviceAllocator::allocate(size_t byte_size) {
         return nullptr;
     }
 
-    // 确保在单卡上面分配显存，当前正在使用的 GPU 设备 ID
-    CHECK(cudaSetDevice(cuda_id_) == cudaSuccess);
+    // // 确保在单卡上面分配显存，当前正在使用的 GPU 设备 ID
+    // CHECK(cudaSetDevice(cuda_id_) == cudaSuccess);
     
     // int32_t cuda_id = -1;
     // CHECK(cudaGetDevice(&cuda_id) == cudaSuccess);

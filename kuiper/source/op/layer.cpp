@@ -201,12 +201,12 @@ std::shared_ptr<kernel::CudaConfig> Layer::cuda_config() const {
 void Layer::to_cuda() {
     for (tensor::Tensor& input : inputs_) {
         if (!input.is_empty()) {
-            input.to_cuda(cuda_config_ ? cuda_config_->stream() : nullptr);
+            input.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
         }
     }
     for (tensor::Tensor& output : outputs_) {
         if (!output.is_empty()) {
-            output.to_cuda(cuda_config_ ? cuda_config_->stream() : nullptr);
+            output.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
         }
     }
 }
@@ -264,7 +264,7 @@ base::Status LayerParam::set_weight(int32_t idx, const std::vector<int32_t>& dim
         const int32_t weight_size = static_cast<int32_t>(weight.size());
         CHECK(weight_size % group_size_ == 0);
         int32_t scales_size = weight_size / group_size_; // 缩放因子 scales 张量的大小
-        float* scales_ptr = reinterpret_cast<float*>(reinterpret_cast<int8_t*>(const_cast<void*>(weight_ptr)) + weight_size);
+        float* scales_ptr = reinterpret_cast<float*>(static_cast<int8_t*>(const_cast<void*>(weight_ptr)) + weight_size);
 
         // 创建 Fp32 类型的 Tensor 缩放因子，同时创建 Buffer 使用 scales_ptr 所指向的外部内存/显存
         scales_ = tensor::Tensor(base::DataType::DataTypeFp32, scales_size, false, nullptr, scales_ptr);
@@ -293,11 +293,11 @@ void LayerParam::to_cuda() {
     Layer::to_cuda();
     for (tensor::Tensor& weight : weights_) {
         if (!weight.is_empty()) {
-            weight.to_cuda(cuda_config_ ? cuda_config_->stream() : nullptr);
+            weight.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
         }
     }
     if (is_quant_layer_ && !scales_.is_empty()) {
-        scales_.to_cuda(cuda_config_ ? cuda_config_->stream() : nullptr);
+        scales_.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
     }
 }
 }  // namespace op

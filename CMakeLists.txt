@@ -161,7 +161,7 @@ set_target_properties(llama PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 add_subdirectory(test)
 
 # 演示代码目录
-# add_subdirectory(demo)
+add_subdirectory(demo)
 
 # ============================================
 # 添加编译选项

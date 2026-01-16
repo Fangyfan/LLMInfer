@@ -10,24 +10,23 @@
 
 namespace model {
 enum class ModelBufferType : uint8_t {
-    InputTokens = 0,       // 输入 tokens
-    InputEmbeddings = 1,   // 输入词嵌入
-    OutputRMSNorm = 2,     // RMS 归一化输出
-    KeyCache = 3,          // 注意力机制的 Key 缓存
-    ValueCache = 4,        // 注意力机制的 Value 缓存
-    Query = 5,             // 查询向量
-    InputPos = 6,          // 输入位置信息
-    ScoreStorage = 7,      // 注意力分数存储
-    OutputMHA = 8,         // 多头注意力输出
-    AttentionOutput = 9,   // 注意力输出
-    W1Output = 10,         // 前馈网络第一层输出
-    W2Output = 11,         // 前馈网络第二层输出
-    W3Output = 12,         // 前馈网络第三层输出
-    FFNRMSNorm = 13,       // FFN 的 RMS 归一化
-    ForwardOutput = 14,    // 前向传播输出
-    ForwardOutputCPU = 15, // CPU 上的前向传播输出
-    SinCache = 16,         // 正弦位置编码缓存
-    CosCache = 17,         // 余弦位置编码缓存
+    TokenIds = 0,           // 输入 token ids
+    TokenPosition = 1,      // 输入 token 的位置
+    TokenEmbeddings = 2,    // 输入 token 的嵌入
+    SinCache = 3,           // RoPE 位置编码 Sin Cache 预计算
+    CosCache = 4,           // RoPE 位置编码 Cos Cache 预计算
+    MHAPreRMSNorm = 5,      // 每个 Transformer Block 中执行 MHA 之前的 RMSNorm 结果
+    Query = 6,              // 注意力机制 Query 向量
+    KeyCache = 7,           // 注意力机制 Key Cache
+    ValueCache = 8,         // 注意力机制 Value Cache
+    AttentionScore = 9,     // 注意力分数: (softmax (QK^T)/sqrt(d))
+    MHAOutput = 10,         // 多头注意力输出: (softmax (QK^T)/sqrt(d)) V
+    AttentionOuput = 11,    // 注意力机制最终经过 Wo 映射输出: MHA * Wo
+    FFNPreRMSNorm = 12,     // 每个 Transformer Block 中执行 FFN 之前的 RMSNorm 结果
+    FFNW1Output = 13,       // FFN 门控投影层 Gate Projection (SiLU 激活)
+    FFNW2Output = 14,       // FFN 下降投影层 Down Projection (将维度映射回 dim)
+    FFNW3Output = 15,       // FFN 上升投影层 Up Projection (通常与 Gate 做点乘)
+    Logits = 16,            // 词表原始分数分布 Logits
 };
 }  // namespace model
 

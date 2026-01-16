@@ -85,7 +85,7 @@ base::Status Model::create_encode_layer() {
 // 这允许模型在推理时直接向特定内存位置写入当前的 K 和 V 向量
 std::pair<tensor::Tensor, tensor::Tensor> Model::slice_kv_cache(int32_t layer_id, int32_t token_pos) const {
     // 1. 指针算术：layer_offset 跳过前面的层，cache_offset 跳过当前层前面的 Token
-    int32_t layer_offset = layer_id * config_->seq_len * config_->kv_dim;
+    int32_t layer_offset = layer_id * config_->max_seq_len * config_->kv_dim;
     int32_t cache_offset = layer_offset + token_pos * config_->kv_dim;
 
     // 2. 切片：从总的 KeyCache 和 ValueCache buffer 中，根据计算出的 offset 拿到指针，构建一个新的 Tensor 对象返回
@@ -102,8 +102,8 @@ std::pair<tensor::Tensor, tensor::Tensor> Model::slice_kv_cache(int32_t layer_id
     return std::make_pair(key, value);
 }
 
-// 输入数据准备: 准备当前步骤的输入 Tensor
-tensor::Tensor Model::fill_input(const tensor::Tensor& token_pos, const op::EmbeddingResult& embedding_result, bool is_prompt) const {
+// 输入数据准备: 准备当前步骤的输入 Tensor (即当前 token 的输入 Embedding)
+tensor::Tensor Model::get_embedding(const tensor::Tensor& token_pos, const op::EmbeddingResult& embedding_result, bool is_prompt) const {
     // 1. 从 embedding_result 中获取嵌入向量
     const tensor::Tensor& token_embeddings = embedding_result.token_embeddings;
     // 2. Prompt 阶段 vs 生成阶段: 
@@ -178,7 +178,7 @@ base::Status Model::read_model_file() {
     raw_model_data_->data = data;
     raw_model_data_->fd = fd;
     raw_model_data_->file_size = file_size;
-    raw_model_data_->weight_data = reinterpret_cast<char*>(data) + sizeof(ModelConfig) + (is_quant_model_ ? sizeof(group_size_) : 0);
+    raw_model_data_->weight_data = static_cast<char*>(data) + sizeof(ModelConfig) + (is_quant_model_ ? sizeof(group_size_) : 0);
     return base::error::success();
 }
 
@@ -218,7 +218,7 @@ base::Status Model::generate_model_info(const ModelConfig& config) const {
     config_->hidden_dim = config.hidden_dim;
     config_->kv_head_num = config.kv_head_num;
     config_->layer_num = config.layer_num;
-    config_->seq_len = config.seq_len;
+    config_->max_seq_len = config.max_seq_len;
     
     // 2. 计算 KV 参数 (kv_dim, kv_mul, head_size)：这里包含了 GQA (Grouped Query Attention) 的逻辑
     CHECK(config_->dim % config_->head_num == 0);

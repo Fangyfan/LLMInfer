@@ -5,10 +5,10 @@
 namespace sampler {
 ArgmaxSampler::ArgmaxSampler(base::DeviceType device_type) : Sampler(device_type) {}
 
-size_t ArgmaxSampler::sample(const float* logits, size_t size, void* stream) const {
+int32_t ArgmaxSampler::sample(const float* logits, int32_t size, void* stream) const {
     CHECK_NE(logits, nullptr);
     CHECK_GT(size, 0);
-    size_t next_token_id = 0;
+    int32_t next_token_id = 0;
     if (device_type_ == base::DeviceType::DeviceCPU) {
         next_token_id = std::distance(logits, std::max_element(logits, logits + size));
     } else if (device_type_ == base::DeviceType::DeviceCUDA) {

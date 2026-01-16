@@ -64,12 +64,12 @@ base::Status MatmulLayer::forward() {
     }
     if (is_quant_layer_) {
         CHECK(device_type_ == base::DeviceType::DeviceCUDA);
-        kernel::get_matmul_kernel_quant8(device_type_)(input, weight, output, scales_, group_size_, cuda_config_->stream());
+        kernel::get_matmul_kernel_quant8(device_type_)(input, weight, output, scales_, group_size_, cuda_config_->stream);
     } else {
-        kernel::get_matmul_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream() : nullptr);
+        kernel::get_matmul_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream : nullptr);
     }
     if (has_bias_) {
-        kernel::get_add_kernel(device_type_)(output, get_bias(0), output, cuda_config_ ? cuda_config_->stream() : nullptr);
+        kernel::get_add_kernel(device_type_)(output, get_bias(0), output, cuda_config_ ? cuda_config_->stream : nullptr);
     }
     return base::error::success();
 }
@@ -107,7 +107,7 @@ void MatmulLayer::to_cuda() {
     if (has_bias_) {
         for (tensor::Tensor& bias : bias_) {
             if (!bias.is_empty()) {
-                bias.to_cuda(cuda_config_ ? cuda_config_->stream() : nullptr);
+                bias.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
             }
         }
     }

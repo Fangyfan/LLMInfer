@@ -85,6 +85,17 @@ EmbeddingKernel get_embedding_kernel(base::DeviceType device_type) {
     }
 }
 
+SinCosCacheKernel get_sin_cos_cache_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCPU) {
+        return sin_cos_cache_precompute_cpu;
+    } else if (device_type == base::DeviceType::DeviceCUDA) {
+        return sin_cos_cache_precompute_cu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a sin/cos cache precompute kernel." << std::endl;
+        return nullptr;
+    }
+}
+
 RoPEKernel get_rope_kernel(base::DeviceType device_type) {
     if (device_type == base::DeviceType::DeviceCPU) {
         return rope_kernel_cpu;

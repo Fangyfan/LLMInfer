@@ -5,8 +5,8 @@ namespace op {
 RMSNormLaryer::RMSNormLaryer(base::DeviceType device_type, int32_t dim)
 : LayerParam(device_type, LayerType::LayerRMSNorm, false, "RMSNorm"), dim_(dim) {
     reset_inputs_size(1);
-    reset_outputs_size(1);
     reset_weights_size(1);
+    reset_outputs_size(1);
 }
 
 base::Status RMSNormLaryer::check() const {
@@ -43,7 +43,7 @@ base::Status RMSNormLaryer::forward() {
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         CHECK_NE(cuda_config_, nullptr);
     }
-    kernel::get_rmsnorm_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream() : nullptr);
+    kernel::get_rmsnorm_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream : nullptr);
     return base::error::success();
 }
 }  // namespace op

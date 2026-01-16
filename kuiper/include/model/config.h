@@ -11,7 +11,7 @@ struct ModelConfig {
     int32_t head_num = 0;       // 注意力机制的总头数 (Query 头数量)
     int32_t kv_head_num = 0;    // 分组注意力的 KV 头数
     int32_t vocab_size = 0;     // 词表大小
-    int32_t seq_len = 0;        // 模型能处理的最长文本长度
+    int32_t max_seq_len = 0;    // 模型能处理的最长文本长度
 };
 
 struct TransformerConfig {
@@ -24,7 +24,7 @@ struct TransformerConfig {
     int32_t layer_num = 0;      // 模型的 Transformer 总层数
     int32_t head_num = 0;       // 注意力机制的总头数 (Query 头数量)
     int32_t kv_head_num = 0;    // 分组注意力的 KV 头的数量
-    int32_t seq_len = 0;        // 模型能处理的最长文本长度
+    int32_t max_seq_len = 0;    // 模型能处理的最长文本长度
     bool is_shared_weight = false;  // Embedding 层 (vocab_size, dim) 和 Output 层 (dim, vocab_size) 是否共享权重
 };
 }  // namespace model

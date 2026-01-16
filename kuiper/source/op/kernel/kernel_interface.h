@@ -58,6 +58,15 @@ using EmbeddingKernel = void (*)(
 );
 EmbeddingKernel get_embedding_kernel(base::DeviceType device_type);
 
+using SinCosCacheKernel = void (*)(
+    int32_t head_size, 
+    int32_t max_seq_len, 
+    const tensor::Tensor& sin_cache, 
+    const tensor::Tensor& cos_cache, 
+    void* stream
+);
+SinCosCacheKernel get_sin_cos_cache_kernel(base::DeviceType device_type);
+
 using RoPEKernel = void (*)(
     int32_t dim, 
     int32_t kv_dim, 
@@ -72,18 +81,18 @@ using RoPEKernel = void (*)(
 RoPEKernel get_rope_kernel(base::DeviceType device_type);
 
 using MHAKernel = void (*)(
-    int32_t layer_index, 
+    int32_t layer_id, 
     int32_t pos, 
-    int32_t kv_mul, 
     int32_t kv_dim, 
-    int32_t seq_len, 
+    int32_t kv_mul, 
     int32_t head_num, 
     int32_t head_size, 
+    int32_t max_seq_len, 
     const tensor::Tensor& query, 
     const tensor::Tensor& score, 
     const tensor::Tensor& key_cache, 
     const tensor::Tensor& value_cache, 
-    const tensor::Tensor& mha_out, 
+    const tensor::Tensor& output, 
     void* stream
 );
 MHAKernel get_mha_kernel(base::DeviceType device_type);

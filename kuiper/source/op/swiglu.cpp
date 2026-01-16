@@ -42,7 +42,7 @@ base::Status SwiGLULayer::forward() {
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         CHECK_NE(cuda_config_, nullptr);
     }
-    kernel::get_swiglu_kernel(device_type_)(input1, input2, output, cuda_config_ ? cuda_config_->stream() : nullptr);
+    kernel::get_swiglu_kernel(device_type_)(input1, input2, output, cuda_config_ ? cuda_config_->stream : nullptr);
     return base::error::success();
 }
 }  // namespace op

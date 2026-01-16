@@ -2,7 +2,7 @@
 #define ARGMAX_KERNEL_CUH
 
 namespace kernel {
-size_t argmax_kernel_cu(const float* input_ptr, size_t size, void* stream);
+int32_t argmax_kernel_cu(const float* input_ptr, int32_t size, void* stream);
 
 }  // namespace kernel
 
