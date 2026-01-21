@@ -89,7 +89,7 @@ base::Status Llama2Model::init(base::DeviceType device_type) {
     // 3. 预计算 RoPE 旋转位置编码 Sin/Cos Cache
     const tensor::Tensor& sin_cache = get_buffer(ModelBufferType::SinCache);
     const tensor::Tensor& cos_cache = get_buffer(ModelBufferType::CosCache);
-    kernel::get_sin_cos_cache_kernel(device_type_)(config_->head_size, config_->max_seq_len, sin_cache, cos_cache, 
+    kernel::get_sin_cos_cache_kernel(device_type_)(config_->head_dim, config_->max_seq_len, sin_cache, cos_cache, 
                                                    cuda_config_ ? cuda_config_->stream : nullptr);
     // 4. 采样器初始化
     sampler_ = std::make_unique<sampler::ArgmaxSampler>(device_type_);
@@ -220,18 +220,18 @@ void Llama2Model::create_nonparam_layers() {
     int32_t kv_dim = config_->kv_dim;
     int32_t kv_mul = config_->kv_mul;
     int32_t head_num = config_->head_num;
-    int32_t head_size = config_->head_size;
+    int32_t head_dim = config_->head_dim;
     int32_t hidden_dim = config_->hidden_dim;
     int32_t max_seq_len = config_->max_seq_len;
 
     // 1. RoPELayer: 创建旋转位置编码算子
-    // 注意参数：dim (总维度), kv_dim (KV维度，用于 GQA/MQA), head_size (每个头的维度)
-    llama2_layers_->rope_layer_ = std::make_unique<op::RoPELayer>(device_type_, dim, kv_dim, head_size);
+    // 注意参数：dim (总维度), kv_dim (KV维度，用于 GQA/MQA), head_dim (每个头的维度)
+    llama2_layers_->rope_layer_ = std::make_unique<op::RoPELayer>(device_type_, dim, kv_dim, head_dim);
 
     // 2. MultiHeadAttention: 创建注意力算子
     // kv_mul_: 这个参数很有意思。如果 kv_mul_ > 1，说明使用了 GQA (Grouped Query Attention)，即多个 Query 头共享一组 KV 头
     // 这是 Llama 2 (70B) 和 Llama 3 的重要特性，能大幅减少显存占用
-    llama2_layers_->mha_layer_ = std::make_unique<op::MultiHeadAttention>(device_type_, kv_dim, kv_mul, head_num, head_size, max_seq_len);
+    llama2_layers_->mha_layer_ = std::make_unique<op::MultiHeadAttention>(device_type_, kv_dim, kv_mul, head_num, head_dim, max_seq_len);
 
     // 3. AddLayer: 向量加法算子
     // 专门用于处理残差连接（Residual Connection），即 Output = Input + F(Input)
@@ -351,7 +351,7 @@ void Llama2Model::create_param_layers() {
     offset += dim;
 
     // 12. RoPE Sin/Cos Freqs : [head/2, seq] : skip sin/cos cache
-    offset += config_->head_size * config_->max_seq_len;
+    offset += config_->head_dim * config_->max_seq_len;
 
     // 13. Output Head : [vocab_size, dim]
     if (config_->is_shared_weight) offset = 0; // 权重共享: 很多小模型为了省显存，输出层和输入 Embedding 层共享同一个矩阵
@@ -479,7 +479,7 @@ void Llama2Model::allocate_model_buffers() {
     int32_t dim = config_->dim;
     int32_t kv_dim = config_->kv_dim;
     int32_t head_num = config_->head_num;
-    int32_t head_size = config_->head_size;
+    int32_t head_dim = config_->head_dim;
     int32_t layer_num = config_->layer_num;
     int32_t vocab_size = config_->vocab_size;
     int32_t hidden_dim = config_->hidden_dim;
@@ -493,8 +493,8 @@ void Llama2Model::allocate_model_buffers() {
     tensor::Tensor token_embeddings(base::DataType::DataTypeFp32, dim, true, allocator);
     insert_buffer(ModelBufferType::TokenEmbeddings, token_embeddings);
 
-    tensor::Tensor sin_cache(base::DataType::DataTypeFp32, max_seq_len, head_size, true, allocator);
-    tensor::Tensor cos_cache(base::DataType::DataTypeFp32, max_seq_len, head_size, true, allocator);
+    tensor::Tensor sin_cache(base::DataType::DataTypeFp32, max_seq_len, head_dim, true, allocator);
+    tensor::Tensor cos_cache(base::DataType::DataTypeFp32, max_seq_len, head_dim, true, allocator);
     insert_buffer(ModelBufferType::SinCache, sin_cache);
     insert_buffer(ModelBufferType::CosCache, cos_cache);
 

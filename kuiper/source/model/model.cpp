@@ -220,10 +220,10 @@ base::Status Model::generate_model_info(const ModelConfig& config) const {
     config_->layer_num = config.layer_num;
     config_->max_seq_len = config.max_seq_len;
     
-    // 2. 计算 KV 参数 (kv_dim, kv_mul, head_size)：这里包含了 GQA (Grouped Query Attention) 的逻辑
+    // 2. 计算 KV 参数 (kv_dim, kv_mul, head_dim)：这里包含了 GQA (Grouped Query Attention) 的逻辑
     CHECK(config_->dim % config_->head_num == 0);
-    config_->head_size = config_->dim / config_->head_num;
-    config_->kv_dim = config_->head_size * config_->kv_head_num;
+    config_->head_dim = config_->dim / config_->head_num;
+    config_->kv_dim = config_->head_dim * config_->kv_head_num;
 
     CHECK(config_->head_num % config_->kv_head_num == 0);
     config_->kv_mul = config_->head_num / config_->kv_head_num;

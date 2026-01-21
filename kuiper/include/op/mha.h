@@ -21,7 +21,7 @@ private:
     int32_t kv_dim_ = 0;        // KV 的维度
     int32_t kv_mul_ = 0;        // KV 头的倍数（通常用于分组查询注意力）
     int32_t head_num_ = 0;      // 注意力头 (Q) 的数量
-    int32_t head_size_ = 0;     // 每个注意力头 (QKV) 的大小
+    int32_t head_dim_ = 0;      // 每个注意力头 (QKV) 的大小
     int32_t max_seq_len_ = 0;   // 最大序列长度
 };
 }  // namespace op

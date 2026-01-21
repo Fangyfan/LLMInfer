@@ -1,4 +1,5 @@
 #include "model/config.h"
+#include "op/matmul.h"
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <fcntl.h>
@@ -23,7 +24,7 @@ TEST(test_load, load_model_config) {
     ASSERT_EQ(config.vocab_size, 4);
 }
 
-TEST(test_load, test_model_weight) {
+TEST(test_load, load_model_weight) {
     std::string model_path = "/home/yifanfang/MyKuiperLLama/tmp/test.bin";
     int32_t fd = open(model_path.data(), O_RDONLY); // open 成功返回非负整数文件描述符 (如 3, 4, 5...)，其中 0, 1, 2 是标准输入、输出、错误
     ASSERT_NE(fd, -1); // open 失败返回 -1
@@ -50,16 +51,80 @@ TEST(test_load, test_model_weight) {
     ASSERT_NE(data, MAP_FAILED);
 
     int32_t size = config.dim * config.hidden_dim;
+    ASSERT_EQ(size, 2048);
     float* weight_data = reinterpret_cast<float*>(static_cast<char*>(data) + sizeof(model::ModelConfig));
     for (int32_t i = 0; i < size; i++) {
-        ASSERT_EQ(*(weight_data + i), float(i));
+        ASSERT_EQ(weight_data[i], float(i));
     }
 
     std::vector<float> buffer(size); // std::vector 自动管理内存
     ASSERT_EQ(fseek(file, sizeof(model::ModelConfig), SEEK_SET), 0); // fseek 将文件指针移动到文件开头偏移 offset 位置，成功返回 0
     ASSERT_EQ(fread(buffer.data(), sizeof(float), size, file), size);
     for (int32_t i = 0; i < size; i++) {
-        ASSERT_EQ(*(weight_data + i), buffer[i]);
+        ASSERT_EQ(weight_data[i], buffer[i]);
     }
 }
 
+TEST(test_load, load_matmul_layer_cpu) {
+    std::string model_path = "/home/yifanfang/MyKuiperLLama/tmp/test.bin";
+    int32_t fd = open(model_path.data(), O_RDONLY); // open 成功返回非负整数文件描述符 (如 3, 4, 5...)，其中 0, 1, 2 是标准输入、输出、错误
+    ASSERT_NE(fd, -1); // open 失败返回 -1
+
+    FILE* file = fopen(model_path.data(), "rb"); // fopen 成功返回非空 FILE* 指针
+    ASSERT_NE(file, nullptr); // fopen 失败返回 NULL
+
+    auto config = model::ModelConfig();
+    ASSERT_EQ(fread(&config, sizeof(model::ModelConfig), 1, file), 1); // fread 成功返回实际读取的"元素个数"（不是字节数）
+
+    ASSERT_EQ(fseek(file, 0, SEEK_END), 0); // fseek 将文件指针移动到文件末尾，成功返回 0
+    size_t file_size = ftell(file); // ftell 获取当前文件指针位置（即文件总大小）
+    
+    struct stat st;
+    ASSERT_NE(fstat(fd, &st), -1); // fstat 文件的状态信息，成功返回 0，失败返回 -1
+    ASSERT_EQ(file_size, st.st_size);
+
+    /*
+    | ModelConfig  | 权重数据（浮点数数组） |
+    | 大小为 sizeof(model::ModelConfig) | 剩余 dim × hidden_dim 部分全是浮点数 |
+    */
+    void* data = mmap(nullptr, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    ASSERT_NE(data, nullptr);
+    ASSERT_NE(data, MAP_FAILED);
+
+    int32_t dim = config.dim;
+    int32_t hidden_dim = config.hidden_dim;
+    int32_t size = dim * hidden_dim;
+    ASSERT_EQ(dim, 16);
+    ASSERT_EQ(hidden_dim, 128);
+    float* weight_data = reinterpret_cast<float*>(static_cast<char*>(data) + sizeof(model::ModelConfig));
+    for (int32_t i = 0; i < size; i++) {
+        ASSERT_EQ(weight_data[i], float(i));
+    }
+
+    auto matmul_layer = std::make_unique<op::MatmulLayer>(base::DeviceType::DeviceCPU, dim, hidden_dim);
+    
+    std::vector<float> in(hidden_dim, 1.f);
+    tensor::Tensor input(base::DataType::DataTypeFp32, hidden_dim, false, nullptr, in.data());
+    input.set_device_type(base::DeviceType::DeviceCPU);
+
+    std::vector<float> out(dim, 0.f);
+    tensor::Tensor output(base::DataType::DataTypeFp32, dim, false, nullptr, out.data());
+    output.set_device_type(base::DeviceType::DeviceCPU);
+
+    matmul_layer->set_input(0, input);
+    matmul_layer->set_output(0, output);
+    matmul_layer->set_weight(0, {dim, hidden_dim}, weight_data, base::DeviceType::DeviceCPU);
+    matmul_layer->forward();
+
+    // weight[16, 128] = [[0, 1, ... , 127], 
+    //                    [128, 129, ... , 255], 
+    //                    ...... , 
+    //                    [1921, 1922, ... , 2048]]
+    // input[128] = [1, 1, 1, 1, ... , 1]
+    // ok[i] = \sum_{j=0}^{127} (128 * i + j) = 128 * 128 * i + 127 * 128 / 2
+    std::vector<float> ok(dim);
+    for (int32_t i = 0; i < dim; i++) {
+        ok[i] = 128 * 128 * i + 127 * 128 / 2;
+    }
+    ASSERT_EQ(out, ok);
+}

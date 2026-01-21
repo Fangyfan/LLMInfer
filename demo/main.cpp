@@ -3,11 +3,10 @@
 #include <glog/logging.h>
 #include "model/llama2.h"
 
-int32_t generate(const model::Llama2Model& model, const std::string& sentence, int total_steps, bool need_print = false) {
+int32_t generate(const model::Llama2Model& model, const std::string& sentence, int total_steps, bool need_output = false) {
     std::vector<int32_t> input_token_ids = model.encode(sentence);
-    if (input_token_ids.empty()) {
-        LOG(FATAL) << "token_ids is empty!" << std::endl;
-    }
+    LOG_IF(FATAL, input_token_ids.size()) << "input token ids is empty!" << std::endl;
+
     int32_t prompt_len = static_cast<int32_t>(input_token_ids.size());
     const op::EmbeddingResult& prompt_embedding_result = model.embedding(input_token_ids);
     
@@ -25,8 +24,7 @@ int32_t generate(const model::Llama2Model& model, const std::string& sentence, i
         } else {
             is_prompt = false;
             std::vector<int32_t> token_ids { next_token_id };
-            const op::EmbeddingResult& embedding_result = model.embedding(token_ids);
-            const tensor::Tensor& token_embedding = model.get_embedding(token_pos, embedding_result, is_prompt);
+            const tensor::Tensor& token_embedding = model.embedding(token_ids).token_embeddings;
             model.predict(token_embedding, token_pos, is_prompt, next_token_id);
         }
         if (model.is_sentence_end(next_token_id)) {
@@ -35,8 +33,7 @@ int32_t generate(const model::Llama2Model& model, const std::string& sentence, i
         generated_token_ids.push_back(is_prompt ? input_token_ids.at(pos + 1) : next_token_id);
         pos += 1;
     }
-
-    if (need_print) {
+    if (need_output) {
         std::cout << model.decode(generated_token_ids) << std::endl;
     }
     return pos;
@@ -50,7 +47,8 @@ int main(int argc, char* argv[]) {
     const char* checkpoint_path = argv[1];
     const char* tokenizer_path = argv[2];
 
-    model::Llama2Model model(base::TokenizerType::EncodeSpe, tokenizer_path, checkpoint_path, false);
+    bool is_quant_model = false;
+    model::Llama2Model model(base::TokenizerType::EncodeSpe, tokenizer_path, checkpoint_path, is_quant_model);
 
     base::Status status = model.init(base::DeviceType::DeviceCUDA);
     if (!status) {
@@ -58,7 +56,7 @@ int main(int argc, char* argv[]) {
     }
 
     auto start = std::chrono::steady_clock().now();
-    std::cout << "Generating..." << std::endl;
+    std::cout << "Llama2" << (is_quant_model ? "(quant)" : "") << " model generating..." << std::endl;
 
     const std::string& sentence = "Hello";
     const int32_t total_steps = 128;

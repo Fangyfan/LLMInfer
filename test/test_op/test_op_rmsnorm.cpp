@@ -1,5 +1,5 @@
 #include <random>
-#include <cuda_runtime_api.h>
+#include <cuda_runtime.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include "../source/op/kernel/kernel_interface.h"

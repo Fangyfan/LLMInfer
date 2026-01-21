@@ -2,8 +2,8 @@
 #include "kernel/kernel_interface.h"
 
 namespace op {
-RoPELayer::RoPELayer(base::DeviceType device_type, int32_t dim, int32_t kv_dim, int32_t head_size) 
-: Layer(device_type, LayerType::LayerRoPE, "RoPE"), dim_(dim), kv_dim_(kv_dim), head_size_(head_size) {
+RoPELayer::RoPELayer(base::DeviceType device_type, int32_t dim, int32_t kv_dim, int32_t head_dim) 
+: Layer(device_type, LayerType::LayerRoPE, "RoPE"), dim_(dim), kv_dim_(kv_dim), head_dim_(head_dim) {
     reset_inputs_size(5);
     reset_outputs_size(1);
 }
@@ -56,7 +56,7 @@ base::Status RoPELayer::forward() {
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         CHECK_NE(cuda_config_, nullptr);
     }
-    kernel::get_rope_kernel(device_type_)(dim_, kv_dim_, head_size_, 
+    kernel::get_rope_kernel(device_type_)(dim_, kv_dim_, head_dim_, 
                                           input_q, input_k, input_pos, sin_cache, cos_cache, 
                                           cuda_config_ ? cuda_config_->stream : nullptr);
     return base::error::success();

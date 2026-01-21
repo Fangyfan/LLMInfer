@@ -21,7 +21,7 @@ public:
 private:
     int32_t dim_ = 0;       // Q 向量总长度，即 embedding 的长度 d_model
     int32_t kv_dim_ = 0;    // KV 向量总长度，在 GQA 中 dim_ % kv_dim_ = 0 (dim_ > kv_dim_)
-    int32_t head_size_ = 0; // 每个注意力头 (QKV head) 大小 (head_num = dim_ / head_size_, kv_head_num = kv_dim_ / head_size_)
+    int32_t head_dim_ = 0;  // 每个注意力头 (QKV head) 大小 (head_num = dim_ / head_dim_, kv_head_num = kv_dim_ / head_dim_)
 };
 }  // namespace op
 

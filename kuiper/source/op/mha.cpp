@@ -2,8 +2,8 @@
 #include "kernel/kernel_interface.h"
 
 namespace op {
-MultiHeadAttention::MultiHeadAttention(base::DeviceType device_type, int32_t kv_dim, int32_t kv_mul, int32_t head_num, int32_t head_size, int32_t max_seq_len)
-: Layer(device_type, LayerType::LayerMHA, "MHA"), kv_dim_(kv_dim), kv_mul_(kv_mul), head_num_(head_num), head_size_(head_size), max_seq_len_(max_seq_len) {
+MultiHeadAttention::MultiHeadAttention(base::DeviceType device_type, int32_t kv_dim, int32_t kv_mul, int32_t head_num, int32_t head_dim, int32_t max_seq_len)
+: Layer(device_type, LayerType::LayerMHA, "MHA"), kv_dim_(kv_dim), kv_mul_(kv_mul), head_num_(head_num), head_dim_(head_dim), max_seq_len_(max_seq_len) {
     reset_inputs_size(4);
     reset_outputs_size(1);
 }
@@ -38,7 +38,7 @@ base::Status MultiHeadAttention::forward() {
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         CHECK_NE(cuda_config_, nullptr);
     }
-    kernel::get_mha_kernel(device_type_)(layer_id_, pos_, kv_dim_, kv_mul_, head_num_, head_size_, max_seq_len_, 
+    kernel::get_mha_kernel(device_type_)(layer_id_, pos_, kv_dim_, kv_mul_, head_num_, head_dim_, max_seq_len_, 
                                          query, score, key_cache, value_cache, output, 
                                          cuda_config_ ? cuda_config_->stream : nullptr);
     return base::error::success();
