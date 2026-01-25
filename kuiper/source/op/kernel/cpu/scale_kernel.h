@@ -4,7 +4,7 @@
 #include "tensor/tensor.h"
 
 namespace kernel {
-void scale_kernel_cpu(float scale, const tensor::Tensor& input);
+void scale_kernel_cpu(const tensor::Tensor& input, float scale);
 
 }  // namespace kernel
 

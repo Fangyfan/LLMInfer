@@ -66,7 +66,7 @@ base::Status MatmulLayer::forward() {
         CHECK(device_type_ == base::DeviceType::DeviceCUDA);
         kernel::get_matmul_kernel_quant8(device_type_)(input, weight, output, scales_, group_size_, cuda_config_->stream);
     } else {
-        kernel::get_matmul_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream : nullptr);
+        kernel::get_matmul_kernel(device_type_)(input, weight, output, 1.0f, cuda_config_ ? cuda_config_->stream : nullptr);
     }
     if (has_bias_) {
         kernel::get_add_kernel(device_type_)(output, get_bias(0), output, cuda_config_ ? cuda_config_->stream : nullptr);

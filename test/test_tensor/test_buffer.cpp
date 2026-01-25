@@ -43,7 +43,7 @@ TEST(test_buffer, cuda_memory1) {
     
     int32_t size = 32;
     float* ptr = new float[size];
-    for (int32_t i = 0; i < size; i++) {
+    for (int32_t i = 0; i < size; ++i) {
         ptr[i] = float(i);
     }
 
@@ -58,7 +58,7 @@ TEST(test_buffer, cuda_memory1) {
     // LOG(INFO) << "copy buffer_cu.ptr() " << buffer_cu.ptr() << " to ptr2 " << ptr2 << ", byte_size = " << size * sizeof(float) << std::endl;
     allocator_cu->memcpy(ptr2, buffer_cu.ptr(), size * sizeof(float), MemcpyKind::MemcpyCUDA2CPU);
     // cudaMemcpy(ptr2, buffer_cu.ptr(), size * sizeof(float), cudaMemcpyDeviceToHost);
-    for (int32_t i = 0; i < size; i++) {
+    for (int32_t i = 0; i < size; ++i) {
         ASSERT_EQ(ptr2[i], ptr[i]);
     }
 
@@ -76,15 +76,15 @@ TEST(test_buffer, cuda_memory2) {
     ASSERT_EQ(buffer_cu1.device_type(), DeviceType::DeviceCUDA);
     ASSERT_EQ(buffer_cu2.device_type(), DeviceType::DeviceCUDA);
 
-    set_value_cu(static_cast<float*>(buffer_cu1.ptr()), size, 1.f);
+    set_value_cu(static_cast<float*>(buffer_cu1.ptr()), size, 1.0f);
 
     buffer_cu2.copy_from(buffer_cu1);
 
     float* ptr = new float[size];
     // allocator_cu->memcpy(ptr, buffer_cu2.ptr(), size * sizeof(float), MemcpyKind::MemcpyCUDA2CPU);
     cudaMemcpy(ptr, buffer_cu2.ptr(), size * sizeof(float), cudaMemcpyDeviceToHost);
-    for (int32_t i = 0; i < size; i++) {
-        ASSERT_EQ(ptr[i], 1.f);
+    for (int32_t i = 0; i < size; ++i) {
+        ASSERT_EQ(ptr[i], 1.0f);
     }
 
     delete[] ptr;
@@ -101,13 +101,13 @@ TEST(test_buffer, cuda_memory3) {
     ASSERT_EQ(buffer_cu.device_type(), DeviceType::DeviceCUDA);
     ASSERT_EQ(buffer.device_type(), DeviceType::DeviceCPU);
 
-    set_value_cu(static_cast<float*>(buffer_cu.ptr()), size, 1.f);
+    set_value_cu(static_cast<float*>(buffer_cu.ptr()), size, 1.0f);
 
     buffer.copy_from(buffer_cu);
 
     float* ptr = static_cast<float*>(buffer.ptr());
-    for (int32_t i = 0; i < size; i++) {
-        ASSERT_EQ(ptr[i], 1.f);
+    for (int32_t i = 0; i < size; ++i) {
+        ASSERT_EQ(ptr[i], 1.0f);
     }
 
     // delete[] ptr; 这里不要手动释放 ptr，因为 ptr 由 buffer 管理，会重复释放

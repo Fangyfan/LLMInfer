@@ -1,5 +1,5 @@
 #include <numeric>
-#include <cuda_device_runtime_api.h>
+#include <cuda_runtime.h>
 #include "tensor/tensor.h"
 
 namespace tensor {

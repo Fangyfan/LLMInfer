@@ -89,7 +89,7 @@ base::Status Llama2Model::init(base::DeviceType device_type) {
     // 3. 预计算 RoPE 旋转位置编码 Sin/Cos Cache
     const tensor::Tensor& sin_cache = get_buffer(ModelBufferType::SinCache);
     const tensor::Tensor& cos_cache = get_buffer(ModelBufferType::CosCache);
-    kernel::get_sin_cos_cache_kernel(device_type_)(config_->head_dim, config_->max_seq_len, sin_cache, cos_cache, 
+    kernel::get_sin_cos_cache_kernel(device_type_)(sin_cache, cos_cache, config_->head_dim, config_->max_seq_len, 
                                                    cuda_config_ ? cuda_config_->stream : nullptr);
     // 4. 采样器初始化
     sampler_ = std::make_unique<sampler::ArgmaxSampler>(device_type_);
@@ -142,9 +142,7 @@ op::EmbeddingResult Llama2Model::embedding(const std::vector<int32_t>& token_ids
     }
 
     // 3. 数据填充: 把输入的 std::vector<int> 拷贝到 Buffer 中
-    for (int32_t i = 0; i < size; i++) {
-        token_ids_.index<int32_t>(i) = token_ids[i];
-    }
+    memcpy(token_ids_.ptr<int32_t>(), token_ids.data(), size * sizeof(int32_t));
     
     // 4. 执行查找: 本质上是查表，根据 token id 从巨大的 Embedding 矩阵中把对应的行复制出来
     tensor::Tensor token_num_(base::DataType::DataTypeInt32, size);
@@ -183,7 +181,7 @@ base::Status Llama2Model::create_layers() {
         llama2_layers_->w3_layers_.size() != config_->layer_num) {
         return base::error::internal_error("Create the matmul layer in the MHA and FFN layers for llama2 model failed.");
     }
-    for (int32_t i = 0; i < config_->layer_num; i++) {
+    for (int32_t i = 0; i < config_->layer_num; ++i) {
         if (!llama2_layers_->wq_layers_[i] || !llama2_layers_->wk_layers_[i] ||
             !llama2_layers_->wv_layers_[i] || !llama2_layers_->wo_layers_[i] ||
             !llama2_layers_->w1_layers_[i] || !llama2_layers_->w2_layers_[i] || !llama2_layers_->w3_layers_[i]) {
@@ -273,7 +271,7 @@ void Llama2Model::create_param_layers() {
     offset += vocab_size * dim;
 
     // 2. RMSNorm (MHA) : [layers, dim]
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto mha_rmsnorm = std::make_unique<op::RMSNormLaryer>(device_type_, dim);
         mha_rmsnorm->set_weight(0, {dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         llama2_layers_->rmsnorm_layers_.push_back(std::move(mha_rmsnorm));
@@ -281,7 +279,7 @@ void Llama2Model::create_param_layers() {
     }
 
     // 3. Attention Wq : [layers, dim, dim]
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto wq = std::make_unique<op::MatmulLayer>(device_type_, dim, dim);
         wq->set_weight(0, {dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         llama2_layers_->wq_layers_.push_back(std::move(wq));
@@ -289,7 +287,7 @@ void Llama2Model::create_param_layers() {
     }
 
     // 4. Attention Wk : [layers, kv_dim, dim]
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto wk = std::make_unique<op::MatmulLayer>(device_type_, kv_dim, dim);
         wk->set_weight(0, {kv_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         llama2_layers_->wk_layers_.push_back(std::move(wk));
@@ -297,7 +295,7 @@ void Llama2Model::create_param_layers() {
     }
 
     // 5. Attention Wv : [layers, kv_dim, dim]
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto wv = std::make_unique<op::MatmulLayer>(device_type_, kv_dim, dim);
         wv->set_weight(0, {kv_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         llama2_layers_->wv_layers_.push_back(std::move(wv));
@@ -305,7 +303,7 @@ void Llama2Model::create_param_layers() {
     }
 
     // 6. Attention Wo : [layers, dim, dim]
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto wo = std::make_unique<op::MatmulLayer>(device_type_, dim, dim);
         wo->set_weight(0, {dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         llama2_layers_->wo_layers_.push_back(std::move(wo));
@@ -313,7 +311,7 @@ void Llama2Model::create_param_layers() {
     }
 
     // 7. RMSNorm (FFN)	: [layers, dim]
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto ffn_rmsnorm = std::make_unique<op::RMSNormLaryer>(device_type_, dim);
         ffn_rmsnorm->set_weight(0, {dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         llama2_layers_->rmsnorm_layers_.push_back(std::move(ffn_rmsnorm));
@@ -321,7 +319,7 @@ void Llama2Model::create_param_layers() {
     }
 
     // 8. FFN W1 (Gate)	: [layers, hidden, dim]
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto w1 = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, dim);
         w1->set_weight(0, {hidden_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         llama2_layers_->w1_layers_.push_back(std::move(w1));
@@ -329,7 +327,7 @@ void Llama2Model::create_param_layers() {
     }
 
     // 9. FFN W2 (Down)	: [layers, dim, hidden]
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto w2 = std::make_unique<op::MatmulLayer>(device_type_, dim, hidden_dim);
         w2->set_weight(0, {dim, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         llama2_layers_->w2_layers_.push_back(std::move(w2));
@@ -337,7 +335,7 @@ void Llama2Model::create_param_layers() {
     }
 
     // 10. FFN W3 (Up) : [layers, hidden, dim]
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto w3 = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, dim);
         w3->set_weight(0, {hidden_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         llama2_layers_->w3_layers_.push_back(std::move(w3));
@@ -377,7 +375,7 @@ void Llama2Model::create_param_quant_layers() {
     int32_t max_seq_len = config_->max_seq_len;
     
     // 1. Attention Wq : [layers, dim, dim] : Int8 + Fp32 Scales
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto wq = std::make_unique<op::MatmulLayer>(device_type_, dim, dim, true);
         wq->set_group_size(group_size_);
         wq->set_weight(0, {dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
@@ -386,7 +384,7 @@ void Llama2Model::create_param_quant_layers() {
     }
 
     // 2. Attention Wk : [layers, kv_dim, dim] : Int8 + Fp32 Scales
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto wk = std::make_unique<op::MatmulLayer>(device_type_, kv_dim, dim, true);
         wk->set_group_size(group_size_);
         wk->set_weight(0, {kv_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
@@ -395,7 +393,7 @@ void Llama2Model::create_param_quant_layers() {
     }
 
     // 3. Attention Wv : [layers, kv_dim, dim] : Int8 + Fp32 Scales
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto wv = std::make_unique<op::MatmulLayer>(device_type_, kv_dim, dim, true);
         wv->set_group_size(group_size_);
         wv->set_weight(0, {kv_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
@@ -404,7 +402,7 @@ void Llama2Model::create_param_quant_layers() {
     }
 
     // 4. Attention Wo : [layers, dim, dim] : Int8 + Fp32 Scales
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto wo = std::make_unique<op::MatmulLayer>(device_type_, dim, dim, true);
         wo->set_group_size(group_size_);
         wo->set_weight(0, {dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
@@ -413,7 +411,7 @@ void Llama2Model::create_param_quant_layers() {
     }
 
     // 5. FFN W1 (Gate)	: [layers, hidden, dim] : Int8 + Fp32 Scales
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto w1 = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, dim, true);
         w1->set_group_size(group_size_);
         w1->set_weight(0, {hidden_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
@@ -422,7 +420,7 @@ void Llama2Model::create_param_quant_layers() {
     }
 
     // 6. FFN W2 (Down)	: [layers, dim, hidden] : Int8 + Fp32 Scales
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto w2 = std::make_unique<op::MatmulLayer>(device_type_, dim, hidden_dim, true);
         w2->set_group_size(group_size_);
         w2->set_weight(0, {dim, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
@@ -431,7 +429,7 @@ void Llama2Model::create_param_quant_layers() {
     }
 
     // 7. FFN W3 (Up) : [layers, hidden, dim] : Int8 + Fp32 Scales
-    for (int32_t i = 0; i < layer_num; i++) {
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto w3 = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, dim, true);
         w3->set_group_size(group_size_);
         w3->set_weight(0, {hidden_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
@@ -453,7 +451,7 @@ void Llama2Model::create_param_quant_layers() {
     offset += vocab_size * dim * sizeof(float);
 
     // 10. RMSNorm : [2 * layers + 1, dim] : 纯 FP32
-    for (int32_t i = 0; i < 2 * layer_num + 1; i++) {
+    for (int32_t i = 0; i < 2 * layer_num + 1; ++i) {
         auto rmsnorm = std::make_unique<op::RMSNormLaryer>(device_type_, dim);
         rmsnorm->set_weight(0, {dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         llama2_layers_->rmsnorm_layers_.push_back(std::move(rmsnorm));
@@ -490,11 +488,11 @@ void Llama2Model::allocate_model_buffers() {
     insert_buffer(ModelBufferType::TokenIds, token_ids);
     insert_buffer(ModelBufferType::TokenPosition, token_pos);
 
-    tensor::Tensor token_embeddings(base::DataType::DataTypeFp32, dim, true, allocator);
+    tensor::Tensor token_embeddings(base::DataType::DataTypeFp32, 1, dim, true, allocator);
     insert_buffer(ModelBufferType::TokenEmbeddings, token_embeddings);
 
-    tensor::Tensor sin_cache(base::DataType::DataTypeFp32, max_seq_len, head_dim, true, allocator);
-    tensor::Tensor cos_cache(base::DataType::DataTypeFp32, max_seq_len, head_dim, true, allocator);
+    tensor::Tensor sin_cache(base::DataType::DataTypeFp32, max_seq_len, head_dim / 2, true, allocator);
+    tensor::Tensor cos_cache(base::DataType::DataTypeFp32, max_seq_len, head_dim / 2, true, allocator);
     insert_buffer(ModelBufferType::SinCache, sin_cache);
     insert_buffer(ModelBufferType::CosCache, cos_cache);
 

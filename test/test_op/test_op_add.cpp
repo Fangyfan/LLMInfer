@@ -11,15 +11,15 @@ TEST(test_op_add, add_cuda_no_stream) {
     tensor::Tensor t_in2(base::DataType::DataTypeFp32, 32, 151, true, allocator_cu);
     tensor::Tensor t_out(base::DataType::DataTypeFp32, 32, 151, true, allocator_cu);
     
-    set_value_cu(t_in1.ptr<float>(), size, 2.f);
-    set_value_cu(t_in2.ptr<float>(), size, 3.f);
+    set_value_cu(t_in1.ptr<float>(), size, 2.0f);
+    set_value_cu(t_in2.ptr<float>(), size, 3.0f);
     kernel::get_add_kernel(base::DeviceType::DeviceCUDA)(t_in1, t_in2, t_out, nullptr);
     cudaDeviceSynchronize();
     
     float* ptr = new float[size];
     cudaMemcpy(ptr, t_out.ptr<float>(), size * sizeof(float), cudaMemcpyDeviceToHost);
-    for (int32_t i = 0; i < size; i++) {
-        ASSERT_EQ(ptr[i], 5.f);
+    for (int32_t i = 0; i < size; ++i) {
+        ASSERT_EQ(ptr[i], 5.0f);
     }
     
     delete[] ptr;
@@ -32,8 +32,8 @@ TEST(test_op_add, add_cuda_stream) {
     tensor::Tensor t_in2(base::DataType::DataTypeFp32, 32, 151, true, allocator_cu);
     tensor::Tensor t_out(base::DataType::DataTypeFp32, 32, 151, true, allocator_cu);
     
-    set_value_cu(t_in1.ptr<float>(), size, 2.f);
-    set_value_cu(t_in2.ptr<float>(), size, 3.f);
+    set_value_cu(t_in1.ptr<float>(), size, 2.0f);
+    set_value_cu(t_in2.ptr<float>(), size, 3.0f);
     
     cudaStream_t stream;
     cudaStreamCreate(&stream);
@@ -42,8 +42,8 @@ TEST(test_op_add, add_cuda_stream) {
     
     float* ptr = new float[size];
     cudaMemcpy(ptr, t_out.ptr<float>(), size * sizeof(float), cudaMemcpyDeviceToHost);
-    for (int32_t i = 0; i < size; i++) {
-        ASSERT_EQ(ptr[i], 5.f);
+    for (int32_t i = 0; i < size; ++i) {
+        ASSERT_EQ(ptr[i], 5.0f);
     }
     
     delete[] ptr;
@@ -57,15 +57,15 @@ TEST(test_op_add, add_cpu) {
     tensor::Tensor t_in2(base::DataType::DataTypeFp32, 32, 151, true, allocator_cpu);
     tensor::Tensor t_out(base::DataType::DataTypeFp32, 32, 151, true, allocator_cpu);
     
-    for (int32_t i = 0; i < size; i++) {
-        t_in1.index<float>(i) = 2.f;
-        t_in2.index<float>(i) = 3.f;
+    for (int32_t i = 0; i < size; ++i) {
+        t_in1.index<float>(i) = 2.0f;
+        t_in2.index<float>(i) = 3.0f;
     }
     kernel::get_add_kernel(base::DeviceType::DeviceCPU)(t_in1, t_in2, t_out, nullptr);
     
     float* ptr = t_out.ptr<float>();
-    for (int32_t i = 0; i < size; i++) {
-        ASSERT_EQ(ptr[i], 5.f);
+    for (int32_t i = 0; i < size; ++i) {
+        ASSERT_EQ(ptr[i], 5.0f);
     }
 }
 
@@ -83,7 +83,7 @@ TEST(test_op_add, add_cuda_align) {
 
     float* ptr = new float[size];
     cudaMemcpy(ptr, t_out.ptr<float>(), size * sizeof(float), cudaMemcpyDeviceToHost);
-    for (int32_t i = 0; i < size; i++) {
+    for (int32_t i = 0; i < size; ++i) {
         ASSERT_NEAR(ptr[i], 5.4f, 1e-5f);
     }
 

@@ -8,6 +8,7 @@ void matmul_kernel_cpu(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 
     const tensor::Tensor& output, 
+    float scale, 
     void* stream
 );
 }  // namespace kernel

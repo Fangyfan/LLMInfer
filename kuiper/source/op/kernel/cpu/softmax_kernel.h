@@ -4,7 +4,7 @@
 #include "tensor/tensor.h"
 
 namespace kernel {
-void softmax_kernel_cpu(const tensor::Tensor& input);
+void softmax_kernel_cpu(const tensor::Tensor& input, void* stream);
 
 }  // namespace kernel
 

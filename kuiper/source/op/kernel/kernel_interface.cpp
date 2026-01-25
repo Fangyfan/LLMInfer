@@ -121,6 +121,8 @@ MHAKernel get_mha_kernel(base::DeviceType device_type) {
 SoftmaxKernel get_softmax_kernel(base::DeviceType device_type) {
     if (device_type == base::DeviceType::DeviceCPU) {
         return softmax_kernel_cpu;
+    } else if (device_type == base::DeviceType::DeviceCUDA) {
+        return softmax_kernel_cu;
     } else {
         LOG(FATAL) << "Unknown device type for get a softmax kernel." << std::endl;
         return nullptr;

@@ -39,7 +39,7 @@ void rmsnorm_kernel_cpu(const tensor::Tensor& input, const tensor::Tensor& weigh
     const float mean = arma::as_scalar(arma::mean(arma::pow(in, 2))) + eps;
 
     // 计算缩放因子: scale = 1 / sqrt(sum_{j=0}^{dim-1} input[j]^2 / dim + eps)
-    const float scale = 1.f / std::sqrt(mean);
+    const float scale = 1.0f / sqrtf(mean);
 
     // 执行顺序：先算括号内 -> (scale * in) -> 再算 % wei
     // (scale * in): 标量 × 向量，arma 中会自动做 广播运算 -> temp[i] = scale * in[i]

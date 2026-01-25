@@ -4,15 +4,15 @@
 #include "op/layer.h"
 
 namespace op {
-// 输入: 向量 q (dim) 、向量 k (kv_dim) 、当前位置 pos 、sin_cache (token_num * head_size) 、 cos_cache (token_num * head_size)
+// 输入: 向量 q (dim) 、向量 k (kv_dim) 、当前位置 pos 、sin_cache (token_num * head_dim) 、 cos_cache (token_num * head_dim)
 // 输出: 向量 RoPE(q) (dim) 和向量 RoPE(k) (kv_dim)
-// 计算公式: RoPE(x): for k = 0, 1, 2, ... head_size/2 - 1 :
+// 计算公式: RoPE(x): for k = 0, 1, 2, ... head_dim/2 - 1 :
 // x[2k]   = cos(pos × theta[pos,2k]) * x[2k] - sin(pos × theta[pos,2k]) * x[2k+1]
 // x[2k+1] = sin(pos × theta[pos,2k]) * x[2k] + cos(pos × theta[pos,2k]) * x[2k+1]
-// theta[pos,2k] = 1 / base^{2k / head_size}
+// theta[pos,2k] = 1 / base^{2k / head_dim}
 class RoPELayer : public Layer {
 public:
-    explicit RoPELayer(base::DeviceType device_type, int32_t dim, int32_t kv_dim, int32_t head_size);
+    explicit RoPELayer(base::DeviceType device_type, int32_t dim, int32_t kv_dim, int32_t head_dim);
     
     base::Status check() const override;
 

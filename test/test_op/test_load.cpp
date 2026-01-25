@@ -53,14 +53,14 @@ TEST(test_load, load_model_weight) {
     int32_t size = config.dim * config.hidden_dim;
     ASSERT_EQ(size, 2048);
     float* weight_data = reinterpret_cast<float*>(static_cast<char*>(data) + sizeof(model::ModelConfig));
-    for (int32_t i = 0; i < size; i++) {
+    for (int32_t i = 0; i < size; ++i) {
         ASSERT_EQ(weight_data[i], float(i));
     }
 
     std::vector<float> buffer(size); // std::vector 自动管理内存
     ASSERT_EQ(fseek(file, sizeof(model::ModelConfig), SEEK_SET), 0); // fseek 将文件指针移动到文件开头偏移 offset 位置，成功返回 0
     ASSERT_EQ(fread(buffer.data(), sizeof(float), size, file), size);
-    for (int32_t i = 0; i < size; i++) {
+    for (int32_t i = 0; i < size; ++i) {
         ASSERT_EQ(weight_data[i], buffer[i]);
     }
 }
@@ -97,17 +97,17 @@ TEST(test_load, load_matmul_layer_cpu) {
     ASSERT_EQ(dim, 16);
     ASSERT_EQ(hidden_dim, 128);
     float* weight_data = reinterpret_cast<float*>(static_cast<char*>(data) + sizeof(model::ModelConfig));
-    for (int32_t i = 0; i < size; i++) {
+    for (int32_t i = 0; i < size; ++i) {
         ASSERT_EQ(weight_data[i], float(i));
     }
 
     auto matmul_layer = std::make_unique<op::MatmulLayer>(base::DeviceType::DeviceCPU, dim, hidden_dim);
     
-    std::vector<float> in(hidden_dim, 1.f);
+    std::vector<float> in(hidden_dim, 1.0f);
     tensor::Tensor input(base::DataType::DataTypeFp32, hidden_dim, false, nullptr, in.data());
     input.set_device_type(base::DeviceType::DeviceCPU);
 
-    std::vector<float> out(dim, 0.f);
+    std::vector<float> out(dim, 0.0f);
     tensor::Tensor output(base::DataType::DataTypeFp32, dim, false, nullptr, out.data());
     output.set_device_type(base::DeviceType::DeviceCPU);
 
@@ -123,7 +123,7 @@ TEST(test_load, load_matmul_layer_cpu) {
     // input[128] = [1, 1, 1, 1, ... , 1]
     // ok[i] = \sum_{j=0}^{127} (128 * i + j) = 128 * 128 * i + 127 * 128 / 2
     std::vector<float> ok(dim);
-    for (int32_t i = 0; i < dim; i++) {
+    for (int32_t i = 0; i < dim; ++i) {
         ok[i] = 128 * 128 * i + 127 * 128 / 2;
     }
     ASSERT_EQ(out, ok);

@@ -6,7 +6,7 @@
 namespace op {
 class MultiHeadAttention : public Layer {
 public:
-    explicit MultiHeadAttention(base::DeviceType device_type, int32_t kv_dim, int32_t kv_mul, int32_t head_num, int32_t head_size, int32_t max_seq_len);
+    explicit MultiHeadAttention(base::DeviceType device_type, int32_t kv_dim, int32_t kv_mul, int32_t head_num, int32_t head_dim, int32_t max_seq_len);
     
     base::Status check() const override;
 

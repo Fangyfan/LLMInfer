@@ -224,6 +224,7 @@ base::Status Model::generate_model_info(const ModelConfig& config) const {
     CHECK(config_->dim % config_->head_num == 0);
     config_->head_dim = config_->dim / config_->head_num;
     config_->kv_dim = config_->head_dim * config_->kv_head_num;
+    CHECK(config_->head_dim % 2 == 0);
 
     CHECK(config_->head_num % config_->kv_head_num == 0);
     config_->kv_mul = config_->head_num / config_->kv_head_num;

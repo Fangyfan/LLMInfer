@@ -21,7 +21,7 @@ struct TransformerConfig {
     int32_t dim = 0;            // 模型的隐藏层维度，也就是 Embedding 长度，即 d_model
     int32_t kv_dim = 0;         // KV 的总维度
     int32_t kv_mul = 0;         // 每个 KV 头对应多少个 Query 头
-    int32_t head_dim = 0;       // 每个注意力头的大小
+    int32_t head_dim = 0;       // 每个注意力头的维度大小
     int32_t head_num = 0;       // 注意力机制的总头数 (Query 头数量)
     int32_t kv_head_num = 0;    // 分组注意力的 KV 头的数量
     int32_t max_seq_len = 0;    // 模型能处理的最长文本长度

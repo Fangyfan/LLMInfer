@@ -3,7 +3,7 @@
 
 namespace kernel {
 // 矩阵乘法: weight[wei_dim0, wei_dim1] × input[in_dim0, in_dim1] = output[wei_dim0, in_dim1]
-void matmul_kernel_cpu(const tensor::Tensor& input, const tensor::Tensor& weight, const tensor::Tensor& output, void* stream) {
+void matmul_kernel_cpu(const tensor::Tensor& input, const tensor::Tensor& weight, const tensor::Tensor& output, float scale, void* stream) {
     UNUSED(stream);
     CHECK(!input.is_empty());
     CHECK(!weight.is_empty());
@@ -25,8 +25,8 @@ void matmul_kernel_cpu(const tensor::Tensor& input, const tensor::Tensor& weight
     }
     
     CHECK_EQ(weight.dims_size(), 2);
-    int32_t wei_dim0 = weight.get_dim(0);
-    int32_t wei_dim1 = weight.get_dim(1);
+    const int32_t wei_dim0 = weight.get_dim(0);
+    const int32_t wei_dim1 = weight.get_dim(1);
     CHECK_EQ(wei_dim1, in_dim0);
     
     CHECK_EQ(output.size(), wei_dim0 * in_dim1);
@@ -45,9 +45,9 @@ void matmul_kernel_cpu(const tensor::Tensor& input, const tensor::Tensor& weight
     // Armadillo 库默认使用 列优先 (Column-Major) 存储
     // 为了避免耗时的数据拷贝，代码使用了“欺骗”维度的技巧：将行优先矩阵封装为列优先矩阵，在数学上等同于对矩阵进行了转置 (A^T)
     // y = Ax => y^T = (Ax)^T = x^T × A^T
-    arma::fmat input_mat(const_cast<float*>(input.ptr<float>()), in_dim1, in_dim0, false, true);
-    arma::fmat weight_mat(const_cast<float*>(weight.ptr<float>()), wei_dim1, wei_dim0, false, true);
-    arma::fmat output_mat(const_cast<float*>(output.ptr<float>()), in_dim1, wei_dim0, false, true);
-    output_mat = input_mat * weight_mat;
+    arma::fmat in_mat(const_cast<float*>(input.ptr<float>()), in_dim1, in_dim0, false, true);
+    arma::fmat wei_mat(const_cast<float*>(weight.ptr<float>()), wei_dim1, wei_dim0, false, true);
+    arma::fmat out_mat(const_cast<float*>(output.ptr<float>()), in_dim1, wei_dim0, false, true);
+    out_mat = (in_mat * wei_mat) * scale;
 }
 }  // namespace kernel

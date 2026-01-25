@@ -23,11 +23,11 @@ void add_kernel_cpu(const tensor::Tensor& input1, const tensor::Tensor& input2, 
     //     const bool copy_mem,   // 参数3：是否拷贝内存 → false = 不拷贝，共享内存，避免拷贝开销
     //     const bool strict_mem  // 参数4：是否严格绑定内存 → true = 严格绑定，不扩容/缩容，向量的长度永远是dim，不会越界访问内存
     // );
-    arma::fvec input1_vec(const_cast<float*>(input1.ptr<float>()), input1.size(), false, true);
-    arma::fvec input2_vec(const_cast<float*>(input2.ptr<float>()), input2.size(), false, true);
-    arma::fvec output_vec(const_cast<float*>(output.ptr<float>()), output.size(), false, true);
+    arma::fvec in1(const_cast<float*>(input1.ptr<float>()), input1.size(), false, true);
+    arma::fvec in2(const_cast<float*>(input2.ptr<float>()), input2.size(), false, true);
+    arma::fvec out(const_cast<float*>(output.ptr<float>()), output.size(), false, true);
 
     // 逐元素相加
-    output_vec = input1_vec + input2_vec;
+    out = in1 + in2;
 }
 }  // namespace kernel
