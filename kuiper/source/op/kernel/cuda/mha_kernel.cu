@@ -53,6 +53,7 @@ static __device__ void softmax_kernel_fp32(float* __restrict__ score_head, int32
 template<int32_t THREAD_PER_BLOCK>
 static __global__ void mha_kernel_fp32(
     const float* __restrict__ query, 
+    float* __restrict__ score, 
     const float* __restrict__ key_cache, 
     const float* __restrict__ value_cache, 
     float* __restrict__ output, 
@@ -60,7 +61,8 @@ static __global__ void mha_kernel_fp32(
     int32_t pos, 
     int32_t kv_dim, 
     int32_t kv_mul, 
-    int32_t head_dim
+    int32_t head_dim, 
+    int32_t max_seq_len
 ) {
     // 每个 Block 负责一个注意力头 Head 的独立计算
     int32_t h = blockIdx.x;
@@ -69,14 +71,14 @@ static __global__ void mha_kernel_fp32(
     float scale = rsqrtf(static_cast<float>(head_dim));
     int32_t head_offset = layer_offset + (h / kv_mul) * head_dim;
     
-    extern __shared__ float shared_mem[]; // 动态块内共享数组: 用来临时存放 query_head 和 score_head
-    float* query_head = shared_mem; // 长度: head_dim
-    float* score_head = shared_mem + head_dim; // 长度: pos + 1
+    extern __shared__ float shared_mem[]; // 动态块内共享数组: 用来临时存放 query_head，长度: head_dim
+    float* query_head = shared_mem;
     for (int32_t i = threadIdx.x; i < head_dim; i += blockDim.x) {
         query_head[i] = query[h * head_dim + i]; // 预加载 query_head 到共享内存
     }
     __syncthreads();
     
+    float* score_head = score + h * max_seq_len;
     const float4* query_head_pack = reinterpret_cast<const float4*>(query_head);
     for (int32_t t = threadIdx.x; t <= pos; t += blockDim.x) {
         int32_t key_cache_offset = head_offset + t * kv_dim;
@@ -136,6 +138,7 @@ void mha_kernel_cu(
     CHECK_EQ(head_dim % pack_size, 0);
 
     const float* query_ptr = query.ptr<float>();
+    float* score_ptr = const_cast<float*>(score.ptr<float>());
     const float* key_cache_ptr = key_cache.ptr<float>();
     const float* value_cache_ptr = value_cache.ptr<float>();
     float* output_ptr = const_cast<float*>(output.ptr<float>());
@@ -143,11 +146,10 @@ void mha_kernel_cu(
     
     constexpr int32_t thread_num = 128;
     const int32_t block_num = head_num;
-    const int32_t shared_size = (head_dim + pos + 1) * sizeof(float); // query_head + score_head
+    const int32_t shared_size = head_dim * sizeof(float); // query_head + score_head
     cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
     mha_kernel_fp32<thread_num><<<block_num, thread_num, shared_size, stream_>>>(
-        query_ptr, key_cache_ptr, value_cache_ptr, output_ptr, 
-        layer_offset, pos, kv_dim, kv_mul, head_dim
+        query_ptr, score_ptr, key_cache_ptr, value_cache_ptr, output_ptr, layer_offset, pos, kv_dim, kv_mul, head_dim, max_seq_len
     );
 }
 }  // namespace kernel

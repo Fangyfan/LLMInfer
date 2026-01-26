@@ -44,6 +44,12 @@ void embedding_kernel_cu(
     const int32_t dim = weight.get_dim(1);
     CHECK_EQ(output.get_dim(0), token_num);
     CHECK_EQ(output.get_dim(1), dim);
+
+    for (int32_t i = 0; i < input.size(); ++i) {
+        int32_t token_id = input.index<int32_t>(i);
+        CHECK_GE(token_id, 0);
+        CHECK_LT(token_id, vocab_size);
+    }
     
     const int32_t* in = input_cu.ptr<int32_t>();
     const float* wei = weight.ptr<float>();

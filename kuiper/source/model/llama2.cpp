@@ -78,7 +78,6 @@ base::Status Llama2Model::init(base::DeviceType device_type) {
         cuda_config_ = std::make_shared<kernel::CudaConfig>();
         cuda_config_->create();
     }
-
     // 2. 模型加载与缓冲区分配(内存/显存)
     base::Status status = create_model();
     if (!status) {
@@ -106,11 +105,17 @@ base::Status Llama2Model::predict(const tensor::Tensor& token_embedding, const t
 }
 
 base::Status Llama2Model::forward(const tensor::Tensor& token_embedding, const tensor::Tensor& token_pos) const {
-    if (token_embedding.is_empty() || token_pos.is_empty()) {
-        return base::error::invalid_argument("The tensor parameter in Llama2Model::forward is empty.");
+    if (token_embedding.is_empty()) {
+        return base::error::invalid_argument("The token_embedding in Llama2Model::forward is empty.");
     }
-    if (token_embedding.get_dim(0) != config_->dim || token_pos.get_dim(0) == 1) {
-        return base::error::invalid_argument("The tensor parameter in Llama2Model::forward has a wrong dim");
+    if (token_pos.is_empty()) {
+        return base::error::invalid_argument("The token_pos in Llama2Model::forward is empty.");
+    }
+    if (token_embedding.get_dim(0) != config_->dim) {
+        return base::error::invalid_argument("The token_embedding in Llama2Model::forward has a wrong dim");
+    }
+    if (token_pos.get_dim(0) != 1) {
+        return base::error::invalid_argument("The token_pos in Llama2Model::forward has a wrong dim");
     }
     // 遍历所有 Transformer Block
     for (int32_t layer_id = 0; layer_id < config_->layer_num; layer_id++) {
@@ -132,6 +137,7 @@ op::EmbeddingResult Llama2Model::embedding(const std::vector<int32_t>& token_ids
     // 1. 获取 Buffer: 从之前准备好的资源池里拿出 TokenIds 和 TokenEmbeddings
     tensor::Tensor token_ids_ = get_buffer(model::ModelBufferType::TokenIds);
     tensor::Tensor token_embeddings_ = get_buffer(model::ModelBufferType::TokenEmbeddings);
+    CHECK(token_embeddings_.dims_size() == 2);
 
     // 2. 动态 Reshape: 虽然 Buffer 是预分配的，但预填充阶段和生成阶段的 token num 不同
     // reshape 操作通常只是修改 Tensor 的元数据（维度信息），只要新大小不超过预分配的容量，就不会触发昂贵的内存重分配
@@ -147,6 +153,7 @@ op::EmbeddingResult Llama2Model::embedding(const std::vector<int32_t>& token_ids
     // 4. 执行查找: 本质上是查表，根据 token id 从巨大的 Embedding 矩阵中把对应的行复制出来
     tensor::Tensor token_num_(base::DataType::DataTypeInt32, size);
     STATUS_CHECK(llama2_layers_->embedding_layer_->forward(token_ids_, token_num_, token_embeddings_));
+    CHECK(token_embeddings_.dims_size() == 2);
     return op::EmbeddingResult(token_ids_, token_embeddings_, token_num_);
 }
 
@@ -379,8 +386,8 @@ void Llama2Model::create_param_quant_layers() {
         auto wq = std::make_unique<op::MatmulLayer>(device_type_, dim, dim, true);
         wq->set_group_size(group_size_);
         wq->set_weight(0, {dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
-        llama2_layers_->wq_layers_.push_back(std::move(wq));
         offset += dim * dim + wq->get_scales_size() * sizeof(float);
+        llama2_layers_->wq_layers_.push_back(std::move(wq));
     }
 
     // 2. Attention Wk : [layers, kv_dim, dim] : Int8 + Fp32 Scales
@@ -388,8 +395,8 @@ void Llama2Model::create_param_quant_layers() {
         auto wk = std::make_unique<op::MatmulLayer>(device_type_, kv_dim, dim, true);
         wk->set_group_size(group_size_);
         wk->set_weight(0, {kv_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
-        llama2_layers_->wk_layers_.push_back(std::move(wk));
         offset += kv_dim * dim + wk->get_scales_size() * sizeof(float);
+        llama2_layers_->wk_layers_.push_back(std::move(wk));
     }
 
     // 3. Attention Wv : [layers, kv_dim, dim] : Int8 + Fp32 Scales
@@ -397,8 +404,8 @@ void Llama2Model::create_param_quant_layers() {
         auto wv = std::make_unique<op::MatmulLayer>(device_type_, kv_dim, dim, true);
         wv->set_group_size(group_size_);
         wv->set_weight(0, {kv_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
-        llama2_layers_->wv_layers_.push_back(std::move(wv));
         offset += kv_dim * dim + wv->get_scales_size() * sizeof(float);
+        llama2_layers_->wv_layers_.push_back(std::move(wv));
     }
 
     // 4. Attention Wo : [layers, dim, dim] : Int8 + Fp32 Scales
@@ -406,8 +413,8 @@ void Llama2Model::create_param_quant_layers() {
         auto wo = std::make_unique<op::MatmulLayer>(device_type_, dim, dim, true);
         wo->set_group_size(group_size_);
         wo->set_weight(0, {dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
-        llama2_layers_->wo_layers_.push_back(std::move(wo));
         offset += dim * dim + wo->get_scales_size() * sizeof(float);
+        llama2_layers_->wo_layers_.push_back(std::move(wo));
     }
 
     // 5. FFN W1 (Gate)	: [layers, hidden, dim] : Int8 + Fp32 Scales
@@ -415,8 +422,8 @@ void Llama2Model::create_param_quant_layers() {
         auto w1 = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, dim, true);
         w1->set_group_size(group_size_);
         w1->set_weight(0, {hidden_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
-        llama2_layers_->w1_layers_.push_back(std::move(w1));
         offset += hidden_dim * dim + w1->get_scales_size() * sizeof(float);
+        llama2_layers_->w1_layers_.push_back(std::move(w1));
     }
 
     // 6. FFN W2 (Down)	: [layers, dim, hidden] : Int8 + Fp32 Scales
@@ -424,8 +431,8 @@ void Llama2Model::create_param_quant_layers() {
         auto w2 = std::make_unique<op::MatmulLayer>(device_type_, dim, hidden_dim, true);
         w2->set_group_size(group_size_);
         w2->set_weight(0, {dim, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
-        llama2_layers_->w2_layers_.push_back(std::move(w2));
         offset += dim * hidden_dim + w2->get_scales_size() * sizeof(float);
+        llama2_layers_->w2_layers_.push_back(std::move(w2));
     }
 
     // 7. FFN W3 (Up) : [layers, hidden, dim] : Int8 + Fp32 Scales
@@ -433,8 +440,8 @@ void Llama2Model::create_param_quant_layers() {
         auto w3 = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, dim, true);
         w3->set_group_size(group_size_);
         w3->set_weight(0, {hidden_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
-        llama2_layers_->w3_layers_.push_back(std::move(w3));
         offset += hidden_dim * dim + w3->get_scales_size() * sizeof(float);
+        llama2_layers_->w3_layers_.push_back(std::move(w3));
     }
 
     // 8. Output Head : [vocab_size, dim] : Int8 + Fp32 Scales

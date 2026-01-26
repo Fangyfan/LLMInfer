@@ -11,11 +11,6 @@ EmbeddingLayer::EmbeddingLayer(base::DeviceType device_type, int32_t dim, int32_
 
 base::Status EmbeddingLayer::check() const {
     base::Status status;
-    status = check_tensor(get_input(1), base::DeviceType::DeviceUnknown, base::DataType::DataTypeInt32);
-    if (!status) {
-        LOG(ERROR) << "The input token number error in the embedding layer." << std::endl;
-        return status;
-    }
     // 当前的输入 token 的数量，注意 prefill 阶段 token_num = prompt_len，decode 阶段 token_num = 1
     int32_t token_num = static_cast<int32_t>(get_input(1).size());
     // 输入 tokens，每个 token ids 值是离散的，在 [0, vocab_size) 范围内

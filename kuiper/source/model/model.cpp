@@ -234,6 +234,18 @@ base::Status Model::generate_model_info(const ModelConfig& config) const {
 
     // 4. 词表大小校正：针对 Llama / Qwen 模型处理词表大小可能为负数或不匹配的情况
     config_->vocab_size = std::abs(config.vocab_size);
+
+    // LOG(INFO) << "dim = " << config_->dim << std::endl;
+    // LOG(INFO) << "head_dim = " << config_->head_dim << std::endl;
+    // LOG(INFO) << "head_num = " << config_->head_num << std::endl;
+    // LOG(INFO) << "hidden_dim = " << config_->hidden_dim << std::endl;
+    // LOG(INFO) << "is_shared_weight = " << config_->is_shared_weight << std::endl;
+    // LOG(INFO) << "kv_dim = " << config_->kv_dim << std::endl;
+    // LOG(INFO) << "kv_head_num = " << config_->kv_head_num << std::endl;
+    // LOG(INFO) << "kv_mul = " << config_->kv_mul << std::endl;
+    // LOG(INFO) << "layer_num = " << config_->layer_num << std::endl;
+    // LOG(INFO) << "max_seq_len = " << config_->max_seq_len << std::endl;
+    // LOG(INFO) << "vocab_size = " << config_->vocab_size << std::endl;
     return base::error::success();
 }
 }  // namespace model
