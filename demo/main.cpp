@@ -14,7 +14,8 @@ int32_t generate(const model::Llama2Model& model, const std::string& sentence, i
     tensor::Tensor token_pos = model.get_buffer(model::ModelBufferType::TokenPosition);
     int32_t pos = 0;
     int32_t next_token_id = -1;
-    std::vector<int32_t> generated_token_ids { input_token_ids.at(0) };
+    // std::vector<int32_t> generated_token_ids { input_token_ids.at(0) };
+    std::vector<int32_t> generated_token_ids;
 
     while (pos < total_steps) {
         token_pos.index<int32_t>(0) = pos;
@@ -52,8 +53,7 @@ int main(int argc, char* argv[]) {
     const char* tokenizer_path = argv[2];
 
     bool is_quant_model = false;
-    // bool is_quant_model = true;
-    model::Llama2Model model(base::TokenizerType::EncodeSpe, tokenizer_path, checkpoint_path, is_quant_model);
+    model::Llama2Model model(base::TokenizerType::EncodeBpe, tokenizer_path, checkpoint_path, is_quant_model);
 
     base::Status status = model.init(base::DeviceType::DeviceCUDA);
     if (!status) {
@@ -61,7 +61,11 @@ int main(int argc, char* argv[]) {
     }
 
     auto start = std::chrono::steady_clock().now();
-    std::cout << "Llama2" << (is_quant_model ? "-quant8" : "") << " model generating..." << std::endl;
+    if (model.tokenizer_type() == base::TokenizerType::EncodeSpe) {
+        std::cout << "Llama2" << (is_quant_model ? "-quant8" : "") << " model generating..." << std::endl;
+    } else {
+        std::cout << "Llama3.2" << (is_quant_model ? "-quant8" : "") << " model generating..." << std::endl;
+    }
 
     const std::string& sentence = "hello";
     const int32_t total_steps = 128;

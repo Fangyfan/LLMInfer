@@ -12,6 +12,10 @@ base::ModelType Model::model_type() const {
     return model_type_;
 }
 
+const base::TokenizerType Model::tokenizer_type() const {
+    return tokenizer_type_;
+}
+
 const std::string& Model::tokenizer_path() const {
     return tokenizer_path_;
 }
@@ -68,7 +72,9 @@ base::Status Model::create_encode_layer() {
     if (tokenizer_type_ == base::TokenizerType::EncodeSpe) {
         encode_layer_ = std::make_unique<op::SpeEncodeLayer>(tokenizer_path_, true, false);
     } else {
-        return base::error::invalid_argument("Unknown tokenizer type in model.cpp::create_encode_layer function.");
+#ifdef LLAMA3_SUPPORT
+        encode_layer_ = std::make_unique<op::BpeEncodeLayer>(tokenizer_path_, true, false);
+#endif
     }
     if (!encode_layer_) {
         return base::error::internal_error("Create the encode layer failed.");

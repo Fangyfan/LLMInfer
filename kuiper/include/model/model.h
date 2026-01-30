@@ -25,6 +25,7 @@ public:
     virtual op::EmbeddingResult embedding(const std::vector<int32_t>& token_ids) const = 0;
 
     base::ModelType model_type() const;
+    const base::TokenizerType tokenizer_type() const;
     const std::string& tokenizer_path() const;
     const std::string& model_path() const;
     virtual tensor::Tensor& get_buffer(ModelBufferType model_buffer_type);

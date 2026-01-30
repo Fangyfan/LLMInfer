@@ -1,6 +1,68 @@
 #include "rope_kernel.cuh"
 
 namespace kernel {
+#if defined (LLAMA3_SUPPORT)
+static __global__ void sin_cos_cache_kernel_fp32(
+    float* __restrict__ sin_cache, 
+    float* __restrict__ cos_cache, 
+    int32_t head_dim, 
+    int32_t max_seq_len
+) {
+    int32_t i = blockIdx.x;
+    int32_t half = head_dim / 2;
+
+    // 使用共享变量让 thread 0 算一次 freq，然后广播到其他线程复用
+    __shared__ float shared_freq;
+    if (threadIdx.x == 0) {
+        shared_freq = 1.0f / powf(500000.0f, (2.0f * i) / head_dim);
+    }
+    __syncthreads();
+    const float freq = shared_freq;
+
+    for (int32_t pos = threadIdx.x; pos < max_seq_len; pos += blockDim.x) {
+        float theta = static_cast<float>(pos) * freq;
+        sincosf(theta, sin_cache + pos * half + i, cos_cache + pos * half + i);
+    }
+}
+
+static __global__ void rope_kernel_fp32(
+    float* __restrict__ q, 
+    float* __restrict__ k, 
+    const float* __restrict__ sptr, 
+    const float* __restrict__ cptr, 
+    int32_t dim, 
+    int32_t kv_dim, 
+    int32_t head_dim
+) {
+    // 当前线程负责第 tid 个 pair
+    int32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // 每个 head 里面有 half 个 pair(i, i + half)
+    int32_t half = head_dim / 2;
+
+    // 计算第 tid 个 pair 在第几个 head 以及 head 内的偏移量 i，表示 head 内的 pair(i, i + half)
+    int32_t head_id = tid / half;
+    int32_t i = tid % half;
+
+    // 当 head_start < kv_dim 时需要旋转 q 和 k，否则只需要旋转 q
+    int32_t head_start = head_id * head_dim;
+    int32_t rotn = head_start < kv_dim ? 2 : 1;
+
+    // sin/cos cache
+    float sin_theta = sptr[i];
+    float cos_theta = cptr[i];
+
+    for (int32_t r = 0; r < rotn; ++r) {
+        float* v = static_cast<float*>(r == 0 ? q : k) + head_start + i;
+        float v0 = v[0];
+        float v1 = v[half];
+        v[0] = v0 * cos_theta - v1 * sin_theta;
+        v[half] = v0 * sin_theta + v1 * cos_theta;
+    }
+}
+
+#elif defined (QWEN2_SUPPORT) || defined (QWEN3_SUPPORT)
+#else
 static __global__ void sin_cos_cache_kernel_fp32(
     float* __restrict__ sin_cache, 
     float* __restrict__ cos_cache, 
@@ -24,27 +86,6 @@ static __global__ void sin_cos_cache_kernel_fp32(
         // *(sin_cache_ptr + pos * half + i) = sinf(theta);
         // *(cos_cache_ptr + pos * half + i) = cosf(theta);
     }
-}
-
-void sin_cos_cache_precompute_cu(
-    const tensor::Tensor& sin_cache, 
-    const tensor::Tensor& cos_cache, 
-    int32_t head_dim, 
-    int32_t max_seq_len, 
-    void* stream
-) {
-    CHECK(!sin_cache.is_empty());
-    CHECK(!cos_cache.is_empty());
-    CHECK(sin_cache.device_type() == base::DeviceType::DeviceCUDA);
-    CHECK(cos_cache.device_type() == base::DeviceType::DeviceCUDA);
-
-    float* sin_cache_ptr = const_cast<float*>(sin_cache.ptr<float>());
-    float* cos_cache_ptr = const_cast<float*>(cos_cache.ptr<float>());
-    
-    const int32_t block_num = head_dim / 2;
-    constexpr int32_t thread_num = 256;
-    cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
-    sin_cos_cache_kernel_fp32<<<block_num, thread_num, 0, stream_>>>(sin_cache_ptr, cos_cache_ptr, head_dim, max_seq_len);
 }
 
 static __device__ __forceinline__ void rotate(float* __restrict__ v, float sin_theta, float cos_theta) {
@@ -82,6 +123,28 @@ static __global__ void rope_kernel_fp32(
         return;
     }
     rotate(k + i, sin_theta, cos_theta); // 旋转全局 (key[i], key[i + 1])
+}
+#endif
+
+void sin_cos_cache_precompute_cu(
+    const tensor::Tensor& sin_cache, 
+    const tensor::Tensor& cos_cache, 
+    int32_t head_dim, 
+    int32_t max_seq_len, 
+    void* stream
+) {
+    CHECK(!sin_cache.is_empty());
+    CHECK(!cos_cache.is_empty());
+    CHECK(sin_cache.device_type() == base::DeviceType::DeviceCUDA);
+    CHECK(cos_cache.device_type() == base::DeviceType::DeviceCUDA);
+
+    float* sin_cache_ptr = const_cast<float*>(sin_cache.ptr<float>());
+    float* cos_cache_ptr = const_cast<float*>(cos_cache.ptr<float>());
+    
+    const int32_t block_num = head_dim / 2;
+    constexpr int32_t thread_num = 256;
+    cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
+    sin_cos_cache_kernel_fp32<<<block_num, thread_num, 0, stream_>>>(sin_cache_ptr, cos_cache_ptr, head_dim, max_seq_len);
 }
 
 void rope_kernel_cu(
