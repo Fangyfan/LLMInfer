@@ -23,6 +23,15 @@ using RMSNormKernel = void (*)(
 );
 RMSNormKernel get_rmsnorm_kernel(base::DeviceType device_type);
 
+using RMSNorm2DKernel = void (*)(
+    const tensor::Tensor& input, 
+    const tensor::Tensor& weight, 
+    const tensor::Tensor& output, 
+    int32_t dim, 
+    void* stream
+);
+RMSNorm2DKernel get_rmsnorm_2d_kernel(base::DeviceType device_type);
+
 using MatmulKernel = void (*)(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 

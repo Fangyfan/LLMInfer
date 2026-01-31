@@ -577,6 +577,7 @@ cd demo
 
 ```bash
 What is AI?
+Qwen3 model generating...
 <think>
 Okay, the user is asking what AI is. Let me start by explaining the basic definition. AI refers to artificial intelligence, which is a technology that allows machines to perform tasks that typically require human intelligence. I should mention key areas like problem-solving, learning, and decision-making.
 
@@ -591,11 +592,9 @@ Artificial Intelligence (AI) refers to the simulation of human intelligence in m
 2. **Make decisions**: Solving problems or making choices based on data.
 3. **Interact with humans**: Understanding natural language, recognizing patterns, and adapting to user inputs.
 
-AI is a subset of computer science and has applications in various fields, including healthcare, finance, education, and autonomous systems. It's continuously evolving, with advancements in machine learning and deep learning enabling more complex AI capabilities. 
-steps:344
-
-duration:9.159417
-
-steps/s:37.556977
+AI is a subset of computer science and has applications in various fields, including healthcare, finance, education, and autonomous systems. It's continuously evolving, with advancements in machine learning and deep learning enabling more complex AI capabilities.
+steps: 344
+time(s): 1.27214
+steps/s: 270.41
 ```
 

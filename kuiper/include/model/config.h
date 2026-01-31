@@ -5,13 +5,16 @@
 
 namespace model {
 struct ModelConfig {
-    int32_t dim = 0;            // 模型的隐藏层维度，也就是 Embedding 长度，即 d_model
-    int32_t hidden_dim = 0;     // 前馈层的中间维度，即 FFN-SwiGLU 隐藏层维度 = (2/3) * 4d
+    int32_t dim = 0;            // 在 LLama 中模型的隐藏层维度，也就是 Embedding 长度，即 d_model，在 Qwen3 中为 Query 向量长度
+    int32_t hidden_dim = 0;     // 在 LLama 中前馈层的中间维度，即 FFN-SwiGLU 隐藏层维度 = (2/3) * 4d，在 Qwen3 中为 Embedding 长度
     int32_t layer_num = 0;      // 模型的 Transformer 总层数
     int32_t head_num = 0;       // 注意力机制的总头数 (Query 头数量)
     int32_t kv_head_num = 0;    // 分组注意力的 KV 头数
     int32_t vocab_size = 0;     // 词表大小
     int32_t max_seq_len = 0;    // 模型能处理的最长文本长度
+#ifdef QWEN3_SUPPORT
+    int32_t immediate_dim = 0;  // 在 Qwen3 中 FFN-SwiGLU 隐藏层中间维度
+#endif
 };
 
 struct TransformerConfig {
@@ -26,6 +29,9 @@ struct TransformerConfig {
     int32_t kv_head_num = 0;    // 分组注意力的 KV 头的数量
     int32_t max_seq_len = 0;    // 模型能处理的最长文本长度
     bool is_shared_weight = false;  // Embedding 层 (vocab_size, dim) 和 Output 层 (dim, vocab_size) 是否共享权重
+#ifdef QWEN3_SUPPORT
+    int32_t immediate_dim = 0;  // 在 Qwen3 中 FFN-SwiGLU 隐藏层中间维度
+#endif
 };
 }  // namespace model
 

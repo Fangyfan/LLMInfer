@@ -2,16 +2,20 @@
 #include <cmath>
 
 namespace kernel {
-#if defined (LLAMA3_SUPPORT)
+#if defined (LLAMA3_SUPPORT) || defined (QWEN2_SUPPORT) || defined (QWEN3_SUPPORT)
 void sin_cos_cache_precompute_cpu(const tensor::Tensor& sin_cache, const tensor::Tensor& cos_cache, 
                                   int32_t head_dim, int32_t max_seq_len, void* stream) {
     int32_t half = head_dim / 2;
     std::vector<float> freq(half);
     const float inv_head_dim = 1.0f / static_cast<float>(head_dim);
-    const float ln_base = std::log(500000.0f); // LLama3.2 与 LLama2 的区别在于 base: 500,000 vs 10,000
+#ifdef LLAMA3_SUPPORT
+    const float ln_base = std::log(500000.0f);
+#else
+    const float ln_base = std::log(1000000.0f);
+#endif
     for (int32_t i = 0; i < half; ++i) {
         freq[i] = std::exp(-2.0 * i * inv_head_dim * ln_base);
-        // freq[i] = 1.0f / std::pow(500000.0f, static_cast<float>(2 * i) / static_cast<float>(head_dim));
+        // freq[i] = 1.0f / std::pow(base, static_cast<float>(2 * i) / static_cast<float>(head_dim));
     }
     for (int32_t pos = 0; pos < max_seq_len; ++pos) {
         float* sin_cache_ptr = const_cast<float*>(sin_cache.ptr<float>(pos * head_dim / 2));
@@ -58,8 +62,6 @@ const tensor::Tensor& sin_cache, const tensor::Tensor& cos_cache, int32_t dim, i
         }
     }
 }
-#elif defined (QWEN2_SUPPORT) || defined (QWEN3_SUPPORT)
-
 #else
 void sin_cos_cache_precompute_cpu(const tensor::Tensor& sin_cache, const tensor::Tensor& cos_cache, 
                                   int32_t head_dim, int32_t max_seq_len, void* stream) {

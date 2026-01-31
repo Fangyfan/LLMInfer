@@ -14,20 +14,27 @@ base::Status RMSNormLaryer::check() const {
     const tensor::Tensor& input = get_input(0); // 输入向量
     const tensor::Tensor& weight = get_weight(0); // 可学习的缩放因子
     const tensor::Tensor& output = get_output(0); // 输出均方根归一化向量
-    status = check_tensor_with_dim(input, device_type_, data_type_, dim_);
-    if (!status) {
-        LOG(ERROR) << "The input tensor error in the rmsnorm layer." << std::endl;
-        return status;
-    }
-    status = check_tensor_with_dim(weight, device_type_, data_type_, dim_);
-    if (!status) {
-        LOG(ERROR) << "The weight tensor error in the rmsnorm layer." << std::endl;
-        return status;
-    }
-    status = check_tensor_with_dim(output, device_type_, data_type_, dim_);
-    if (!status) {
-        LOG(ERROR) << "The output tensor error in the rmsnorm layer." << std::endl;
-        return status;
+    if (input.dims_size() > 1) {
+        int32_t d = input.dims_size() - 1;
+        if (input.get_dim(d) != dim_ || weight.get_dim(0) != dim_ || output.get_dim(d) != dim_) {
+            return base::error::invalid_argument("The tensor has a wrong dim in dim -1");
+        }
+    } else {
+        status = check_tensor_with_dim(input, device_type_, data_type_, dim_);
+        if (!status) {
+            LOG(ERROR) << "The input tensor error in the rmsnorm layer." << std::endl;
+            return status;
+        }
+        status = check_tensor_with_dim(weight, device_type_, data_type_, dim_);
+        if (!status) {
+            LOG(ERROR) << "The weight tensor error in the rmsnorm layer." << std::endl;
+            return status;
+        }
+        status = check_tensor_with_dim(output, device_type_, data_type_, dim_);
+        if (!status) {
+            LOG(ERROR) << "The output tensor error in the rmsnorm layer." << std::endl;
+            return status;
+        }
     }
     return base::error::success();
 }
@@ -43,7 +50,11 @@ base::Status RMSNormLaryer::forward() {
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         CHECK_NE(cuda_config_, nullptr);
     }
-    kernel::get_rmsnorm_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream : nullptr);
+    if (input.dims_size() == 1) {
+        kernel::get_rmsnorm_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream : nullptr);
+    } else {
+        kernel::get_rmsnorm_2d_kernel(device_type_)(input, weight, output, dim_, cuda_config_ ? cuda_config_->stream : nullptr);
+    }
     return base::error::success();
 }
 }  // namespace op

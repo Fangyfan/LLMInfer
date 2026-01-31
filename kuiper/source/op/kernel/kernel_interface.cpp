@@ -43,6 +43,15 @@ RMSNormKernel get_rmsnorm_kernel(base::DeviceType device_type) {
     }
 }
 
+RMSNorm2DKernel get_rmsnorm_2d_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
+        return rmsnorm_2d_kernel_cu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a rmsnorm kernel." << std::endl;
+        return nullptr;
+    }
+}
+
 MatmulKernel get_matmul_kernel(base::DeviceType device_type) {
     if (device_type == base::DeviceType::DeviceCPU) {
         return matmul_kernel_cpu;

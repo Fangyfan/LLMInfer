@@ -1,7 +1,7 @@
 #include "rope_kernel.cuh"
 
 namespace kernel {
-#if defined (LLAMA3_SUPPORT)
+#if defined (LLAMA3_SUPPORT) || defined (QWEN2_SUPPORT) || defined (QWEN3_SUPPORT)
 static __global__ void sin_cos_cache_kernel_fp32(
     float* __restrict__ sin_cache, 
     float* __restrict__ cos_cache, 
@@ -14,7 +14,11 @@ static __global__ void sin_cos_cache_kernel_fp32(
     // 使用共享变量让 thread 0 算一次 freq，然后广播到其他线程复用
     __shared__ float shared_freq;
     if (threadIdx.x == 0) {
+#ifdef LLAMA3_SUPPORT
         shared_freq = 1.0f / powf(500000.0f, (2.0f * i) / head_dim);
+#else
+        shared_freq = 1.0f / powf(1000000.0f, (2.0f * i) / head_dim);
+#endif
     }
     __syncthreads();
     const float freq = shared_freq;
@@ -60,8 +64,6 @@ static __global__ void rope_kernel_fp32(
         v[half] = v0 * sin_theta + v1 * cos_theta;
     }
 }
-
-#elif defined (QWEN2_SUPPORT) || defined (QWEN3_SUPPORT)
 #else
 static __global__ void sin_cos_cache_kernel_fp32(
     float* __restrict__ sin_cache, 

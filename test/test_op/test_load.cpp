@@ -1,3 +1,4 @@
+#ifndef QWEN3_SUPPORT
 #include "model/config.h"
 #include "op/matmul.h"
 #include <glog/logging.h>
@@ -128,3 +129,4 @@ TEST(test_load, load_matmul_layer_cpu) {
     }
     ASSERT_EQ(out, ok);
 }
+#endif

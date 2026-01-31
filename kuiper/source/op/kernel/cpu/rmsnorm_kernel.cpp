@@ -35,7 +35,11 @@ void rmsnorm_kernel_cpu(const tensor::Tensor& input, const tensor::Tensor& weigh
     // 步骤2: arma::mean(...) -> 对向量的所有元素求算术平均值(输出为 arma::fscalar 单精度浮点标量) -> (Σin[j]^2) / dim
     // 步骤3: arma::as_scalar(...) -> 把 arma::fscalar 类型转换成 C++ 原生的 float 类型
     // 步骤4: +eps -> 极小值，防止后续计算倒数平方根时分母为 0
-    const float eps = 1e-5f;
+#if defined(QWEN2_SUPPORT) || defined(QWEN3_SUPPORT)
+    constexpr float eps = 1e-6f;
+#else
+    constexpr float eps = 1e-5f;
+#endif
     const float mean = arma::as_scalar(arma::mean(arma::pow(in, 2))) + eps;
 
     // 计算缩放因子: scale = 1 / sqrt(sum_{j=0}^{dim-1} input[j]^2 / dim + eps)
