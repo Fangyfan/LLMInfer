@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
     const char* tokenizer_path = argv[2];
 
     bool is_quant_model = false;
-    model::Llama2Model model(base::TokenizerType::EncodeBpe, tokenizer_path, checkpoint_path, is_quant_model);
+    model::Llama2Model model(base::TokenizerType::EncodeSpe, tokenizer_path, checkpoint_path, is_quant_model);
 
     base::Status status = model.init(base::DeviceType::DeviceCUDA);
     if (!status) {

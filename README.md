@@ -358,17 +358,74 @@ cd MyKuiperLLama
 ```bash
 # 创建 build 目录
 mkdir build && cd build
+# 清空 build 目录
+rm -rf *
 # 需要安装上述的第三方依赖
 cmake ..
 # 编译
 make -j$(nproc)
 ```
 
-用 Debug 模式进行编译（用于 VS Code 断点调试）
+
+
+## VS Code 断点调试
+
+用 Debug 模式进行编译
 
 ```bash
 cmake .. -DCMAKE_BUILD_TYPE=Debug
+make -j$(nproc)
 ```
+
+修改 launch.json 文件
+
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(gdb) launch",
+            "type": "cppdbg",
+            "request": "launch",
+            
+            // 调试哪个可执行文件
+            "program": "${workspaceFolder}/build/demo/llama_infer",
+            // "program": "${workspaceFolder}/build/test/test_llm",
+            
+            // 可执行文件的命令行参数，如需要可添加
+            "args": [
+                "${workspaceFolder}/models/llama2/stories110M.bin",
+                "${workspaceFolder}/models/llama2/tokenizer.model",
+            ],
+            // "args": [],
+
+            // 是否在main函数入口暂停
+            "stopAtEntry": false,
+            // 工作目录，根据需要调整
+            "cwd": "${workspaceFolder}",
+            // 环境变量，例如 [{"name": "LD_LIBRARY_PATH", "value": "/usr/local/lib"}]
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb (为 gdb 启用整齐打印)",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+        }
+    ]
+}
+```
+
+在程序中打上断点，点击左侧 “运行和调试” 图标，在左侧栏上面点击绿色三角符号（开始调试）即可
 
 
 
@@ -460,8 +517,8 @@ hello, who was a little girl. She was three years old and loved to explore. One 
 Suddenly, a man appeared. He was wearing a big hat and had a big smile on his face. He said, "Hello there! Would you like to have a balloon?"
 The little girl nodded her head and the man reached up and grabbed the balloon. He handed
 steps: 128
-time(s): 0.110267
-steps/s: 1160.82
+time(s): 0.109198
+steps/s: 1172.18
 ```
 
 

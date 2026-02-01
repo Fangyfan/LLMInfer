@@ -7,15 +7,15 @@
             "request": "launch",
             
             // 调试哪个可执行文件
-            // "program": "${workspaceFolder}/build/demo/llama_infer",
-            "program": "${workspaceFolder}/build/test/test_llm",
+            "program": "${workspaceFolder}/build/demo/llama_infer",
+            // "program": "${workspaceFolder}/build/test/test_llm",
             
             // 可执行文件的命令行参数，如需要可添加
-            // "args": [
-            //     "${workspaceFolder}/models/stories110M.bin",
-            //     "${workspaceFolder}/models/tokenizer.model",
-            // ],
-            "args": [],
+            "args": [
+                "${workspaceFolder}/models/llama2/stories110M.bin",
+                "${workspaceFolder}/models/llama2/tokenizer.model",
+            ],
+            // "args": [],
 
             // 是否在main函数入口暂停
             "stopAtEntry": false,
