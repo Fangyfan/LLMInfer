@@ -343,6 +343,47 @@ make install
 
 
 
+## 环境变量设置
+
+由于使用 conda 安装了相关依赖，但是 conda 又引入了一些库，其中有些 conda 库与系统目录下的库发生冲突：比如我希望编译时库和链接时库是相同的，但是很多时候一个是系统库，另一个是 conda 库，导致版本冲突，编译失败 。
+
+我们希望项目在编译和链接时，优先在系统目录中查找库，如果系统目录找不到，再去查找 conda 库 。
+
+因此，在 ~/.bashrc 文件中添加
+
+```bash
+# prefer local install
+export HOME_LOCAL="$HOME/local"
+
+# ALWAYS prefer local include/lib before system ones
+export LD_LIBRARY_PATH="${HOME_LOCAL}/lib:/usr/local/lib:/usr/lib"
+export LIBRARY_PATH="${HOME_LOCAL}/lib:/usr/local/lib:/usr/lib"
+
+# Put local include first; do NOT add conda include to CPATH/CXX_INCLUDE_PATH
+export CPATH="${HOME_LOCAL}/include:/usr/local/include:/usr/include"
+export C_INCLUDE_PATH="${HOME_LOCAL}/include:/usr/local/include:/usr/include"
+export CXX_INCLUDE_PATH="${HOME_LOCAL}/include:/usr/local/include:/usr/include"
+
+# Only if conda is active, append its lib path to LD_LIBRARY_PATH, but DO NOT prepend conda include
+if [ -n "${CONDA_PREFIX}" ]; then
+    export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${CONDA_PREFIX}/lib"
+    export PKG_CONFIG_PATH="${HOME_LOCAL}/lib/pkgconfig:${CONDA_PREFIX}/lib/pkgconfig:/usr/local/lib/pkgconfig:/usr/lib/pkgconfig"
+else
+    export PKG_CONFIG_PATH="${HOME_LOCAL}/lib/pkgconfig:/usr/local/lib/pkgconfig:/usr/lib/pkgconfig"
+fi
+
+# Ensure cmake prefers ${HOME_LOCAL} for find_package lookups
+export CMAKE_PREFIX_PATH="${HOME_LOCAL}:${CMAKE_PREFIX_PATH}"
+```
+
+运行如下命令，使环境变量生效
+
+```bash
+source ~/.bashrc
+```
+
+
+
 ## 项目编译方法
 
 克隆源码
@@ -399,11 +440,8 @@ make -j$(nproc)
             ],
             // "args": [],
 
-            // 是否在main函数入口暂停
             "stopAtEntry": false,
-            // 工作目录，根据需要调整
             "cwd": "${workspaceFolder}",
-            // 环境变量，例如 [{"name": "LD_LIBRARY_PATH", "value": "/usr/local/lib"}]
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
