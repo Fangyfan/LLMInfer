@@ -22,7 +22,7 @@
 
 依赖库安装
 
-MyKuiperLLama 依赖 Armadillo 数学库，而 Armadillo 需先安装底层依赖（OpenBLAS、LAPACK 等），命令如下
+LLMInfer 依赖 Armadillo 数学库，而 Armadillo 需先安装底层依赖（OpenBLAS、LAPACK 等），命令如下
 
 ```bash
 sudo apt install libopenblas-dev liblapack-dev libarpack2-dev libsuperlu-dev
@@ -389,9 +389,9 @@ source ~/.bashrc
 克隆源码
 
 ```bash
-git clone git@github.com:Fangyfan/MyKuiperLLama.git
+git clone git@github.com:Fangyfan/LLMInfer.git
 # 进入源码目录
-cd MyKuiperLLama
+cd LLMInfer
 ```
 
 编译
@@ -480,7 +480,7 @@ cd test
 
 ## 分词器与模型权重下载
 
-下载 TinyLLama 的模型和分词器到 ~/MyKuiperLLama/models
+下载 TinyLLama 的模型和分词器到 ~/LLMInfer/models
 
 1. SentencePiece (SPE) 分词器：https://huggingface.co/yahma/llama-7b-hf/blob/main/tokenizer.model
 2. LLama2 非量化模型权重：https://huggingface.co/karpathy/tinyllamas/blob/main/stories110M.bin
@@ -513,7 +513,7 @@ base::Status status = model.init(base::DeviceType::DeviceCPU);
 
 ```bash
 cd demo
-./llama_infer /home/yifanfang/MyKuiperLLama/models/llama2/stories110M.bin /home/yifanfang/MyKuiperLLama/models/llama2/tokenizer.model
+./llama_infer /home/yifanfang/LLMInfer/models/llama2/stories110M.bin /home/yifanfang/LLMInfer/models/llama2/tokenizer.model
 ```
 
 在一张 NVIDIA GeForce RTX 4090 上的运行结果
@@ -524,8 +524,8 @@ hello, who was a little girl. She was three years old and loved to explore. One 
 Suddenly, a man appeared. He was wearing a big hat and had a big smile on his face. He said, "Hello there! Would you like to have a balloon?"
 The little girl nodded her head and the man reached up and grabbed the balloon. He handed
 steps: 128
-time(s): 166.207
-steps/s: 0.770125
+time(s): 5.62209
+steps/s: 22.7673
 ```
 
 
@@ -544,7 +544,7 @@ base::Status status = model.init(base::DeviceType::DeviceCUDA);
 
 ```bash
 cd demo
-./llama_infer /home/yifanfang/MyKuiperLLama/models/llama2/stories110M.bin /home/yifanfang/MyKuiperLLama/models/llama2/tokenizer.model
+./llama_infer /home/yifanfang/LLMInfer/models/llama2/stories110M.bin /home/yifanfang/LLMInfer/models/llama2/tokenizer.model
 ```
 
 在一张 NVIDIA GeForce RTX 4090 上的运行结果
@@ -575,7 +575,7 @@ base::Status status = model.init(base::DeviceType::DeviceCUDA);
 
 ```bash
 cd demo
-./llama_infer /home/yifanfang/MyKuiperLLama/models/llama2/chat_q8.bin /home/yifanfang/MyKuiperLLama/models/llama2/tokenizer.model
+./llama_infer /home/yifanfang/LLMInfer/models/llama2/chat_q8.bin /home/yifanfang/LLMInfer/models/llama2/tokenizer.model
 ```
 
 在一张 NVIDIA GeForce RTX 4090 上的运行结果
@@ -627,7 +627,7 @@ base::Status status = model.init(base::DeviceType::DeviceCUDA);
 
 ```bash
 cd demo
-./llama_infer /home/yifanfang/MyKuiperLLama/models/llama3.2/llama32_1bnq.bin /home/yifanfang/MyKuiperLLama/models/llama3.2/tokenizer.json
+./llama_infer /home/yifanfang/LLMInfer/models/llama3.2/llama32_1bnq.bin /home/yifanfang/LLMInfer/models/llama3.2/tokenizer.json
 ```
 
 在一张 NVIDIA GeForce RTX 4090 上的运行结果
@@ -665,7 +665,7 @@ base::Status status = model.init(base::DeviceType::DeviceCUDA);
 
 ```bash
 cd demo
-./qwen3_infer /home/yifanfang/MyKuiperLLama/models/qwen3/qwen0.6.bin2 /home/yifanfang/MyKuiperLLama/models/qwen3/tokenizer.json
+./qwen3_infer /home/yifanfang/LLMInfer/models/qwen3/qwen0.6.bin2 /home/yifanfang/LLMInfer/models/qwen3/tokenizer.json
 ```
 
 在一张 NVIDIA GeForce RTX 4090 上的运行结果
