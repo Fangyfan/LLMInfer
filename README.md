@@ -519,9 +519,13 @@ Llama2 model generating...
 hello, who was a little girl. She was three years old and loved to explore. One day, she was walking in the park when she saw a big, red balloon. She was so excited and ran over to it. She reached out to grab it, but it was too high.
 Suddenly, a man appeared. He was wearing a big hat and had a big smile on his face. He said, "Hello there! Would you like to have a balloon?"
 The little girl nodded her head and the man reached up and grabbed the balloon. He handed
+
+--------------- Performance Metrics ---------------
 steps: 128
-time(s): 5.62209
-steps/s: 22.7673
+time(s): 5.52254
+steps/s: 23.1777
+TTFT (First Token Latency): 28.1871ms
+TPOT (Average Token Latency): 43.6042ms
 ```
 
 
@@ -550,9 +554,13 @@ Llama2 model generating...
 hello, who was a little girl. She was three years old and loved to explore. One day, she was walking in the park when she saw a big, red balloon. She was so excited and ran over to it. She reached out to grab it, but it was too high.
 Suddenly, a man appeared. He was wearing a big hat and had a big smile on his face. He said, "Hello there! Would you like to have a balloon?"
 The little girl nodded her head and the man reached up and grabbed the balloon. He handed
+
+--------------- Performance Metrics ---------------
 steps: 128
-time(s): 0.109198
-steps/s: 1172.18
+time(s): 0.109787
+steps/s: 1165.89
+TTFT (First Token Latency): 1.92466ms
+TPOT (Average Token Latency): 0.855276ms
 ```
 
 
@@ -593,9 +601,13 @@ JASON: (smiling) Thanks, Dad.
 JASON'S MOTHER: (smiling) You're welcome.
 
 
+
+--------------- Performance Metrics ---------------
 steps: 128
-time(s): 0.362295
-steps/s: 353.303
+time(s): 0.363058
+steps/s: 352.56
+TTFT (First Token Latency): 5.99446ms
+TPOT (Average Token Latency): 2.83316ms
 ```
 
 
@@ -631,9 +643,13 @@ cd demo
 ```bash
 Llama3.2 model generating...
 hello, i am a little bit confused with the same thing about the same time, ...
+
+--------------- Performance Metrics ---------------
 steps: 128
-time(s): 0.715422
-steps/s: 178.915
+time(s): 0.716756
+steps/s: 178.582
+TTFT (First Token Latency): 13.4336ms
+TPOT (Average Token Latency): 5.5815ms
 ```
 
 
@@ -684,8 +700,12 @@ Artificial Intelligence (AI) refers to the simulation of human intelligence in m
 3. **Interact with humans**: Understanding natural language, recognizing patterns, and adapting to user inputs.
 
 AI is a subset of computer science and has applications in various fields, including healthcare, finance, education, and autonomous systems. It's continuously evolving, with advancements in machine learning and deep learning enabling more complex AI capabilities.
+
+--------------- Performance Metrics ---------------
 steps: 344
-time(s): 1.27214
-steps/s: 270.41
+time(s): 1.27312
+steps/s: 270.202
+TTFT (First Token Latency): 49.2878ms
+TPOT (Average Token Latency): 3.697ms
 ```
 
