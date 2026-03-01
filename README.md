@@ -4,7 +4,7 @@
 
 ## 项目介绍
 
-- 基于现代 C++20 语法和 CUDA 并行编程，从零实现支持 Llama2、Llama3.2 和 Qwen3 的高性能大模型推理框架 。
+- 基于现代 C++17 语法和 CUDA 并行编程，从零实现支持 Llama2/3 和 Qwen3 的高性能大模型推理框架 。
 - 采用 CPU 算子和 CUDA 算子双后端实现，同时支持 CUDA 加速和 Int8 量化 。
 - 手动实现 Add、Embedding、RMSNorm（层归一化）、SwiGLU（激活函数）、RoPE（位置编码）、GEMV（矩阵向量乘法，支持 INT8 量化）、Softmax、Multi-Head Attention（GQA 多头注意力机制）、Argmax（采样）等 CPU / CUDA 大模型推理算子 。
 - 使用 Warp 规约 / Block 规约 / 共享内存 / 向量化存取等技术优化 CUDA 算子性能 。
@@ -429,16 +429,12 @@ make -j$(nproc)
             "type": "cppdbg",
             "request": "launch",
             
-            // 调试哪个可执行文件
             "program": "${workspaceFolder}/build/demo/llama_infer",
-            // "program": "${workspaceFolder}/build/test/test_llm",
             
-            // 可执行文件的命令行参数，如需要可添加
             "args": [
                 "${workspaceFolder}/models/llama2/stories110M.bin",
                 "${workspaceFolder}/models/llama2/tokenizer.model",
             ],
-            // "args": [],
 
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
