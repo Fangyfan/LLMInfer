@@ -7,7 +7,7 @@
 #include <sys/mman.h>
 
 TEST(test_load, load_model_config) {
-    std::string model_path = "/home/yifanfang/MyKuiperLLama/tmp/test.bin";
+    std::string model_path = "/home/yifanfang/LLMInfer/tmp/test.bin";
     int32_t fd = open(model_path.data(), O_RDONLY); // open 成功返回非负整数文件描述符 (如 3, 4, 5...)，其中 0, 1, 2 是标准输入、输出、错误
     ASSERT_NE(fd, -1); // open 失败返回 -1
 
@@ -26,7 +26,7 @@ TEST(test_load, load_model_config) {
 }
 
 TEST(test_load, load_model_weight) {
-    std::string model_path = "/home/yifanfang/MyKuiperLLama/tmp/test.bin";
+    std::string model_path = "/home/yifanfang/LLMInfer/tmp/test.bin";
     int32_t fd = open(model_path.data(), O_RDONLY); // open 成功返回非负整数文件描述符 (如 3, 4, 5...)，其中 0, 1, 2 是标准输入、输出、错误
     ASSERT_NE(fd, -1); // open 失败返回 -1
 
@@ -67,7 +67,7 @@ TEST(test_load, load_model_weight) {
 }
 
 TEST(test_load, load_matmul_layer_cpu) {
-    std::string model_path = "/home/yifanfang/MyKuiperLLama/tmp/test.bin";
+    std::string model_path = "/home/yifanfang/LLMInfer/tmp/test.bin";
     int32_t fd = open(model_path.data(), O_RDONLY); // open 成功返回非负整数文件描述符 (如 3, 4, 5...)，其中 0, 1, 2 是标准输入、输出、错误
     ASSERT_NE(fd, -1); // open 失败返回 -1
 

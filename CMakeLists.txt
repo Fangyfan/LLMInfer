@@ -70,21 +70,21 @@ find_package(Armadillo REQUIRED)
 # ============================================
 
 # Tensor相关源文件
-aux_source_directory(kuiper/source/tensor/ DIR_TENSOR)
+aux_source_directory(code/source/tensor/ DIR_TENSOR)
 # 基础模块源文件
-aux_source_directory(kuiper/source/base/ DIR_BASE)
+aux_source_directory(code/source/base/ DIR_BASE)
 # 操作符相关源文件
-aux_source_directory(kuiper/source/op/ DIR_OP)
+aux_source_directory(code/source/op/ DIR_OP)
 # 模型相关源文件
-aux_source_directory(kuiper/source/model/ DIR_MODEL)
+aux_source_directory(code/source/model/ DIR_MODEL)
 # CPU内核源文件
-aux_source_directory(kuiper/source/op/kernel/cpu DIR_KERNEL_CPU)
+aux_source_directory(code/source/op/kernel/cpu DIR_KERNEL_CPU)
 # CUDA内核源文件
-aux_source_directory(kuiper/source/op/kernel/cuda DIR_KERNEL_CUDA)
+aux_source_directory(code/source/op/kernel/cuda DIR_KERNEL_CUDA)
 # 通用内核源文件
-aux_source_directory(kuiper/source/op/kernel/ DIR_KERNEL)
+aux_source_directory(code/source/op/kernel/ DIR_KERNEL)
 # 采样器源文件
-aux_source_directory(kuiper/source/sampler DIR_SAMPLE)
+aux_source_directory(code/source/sampler DIR_SAMPLE)
 
 # ============================================
 # 库文件输出目录
@@ -131,7 +131,7 @@ target_link_directories(llama PUBLIC ${CMAKE_CUDA_COMPILER_LIBRARY_ROOT}/lib64)
 
 # 项目头文件目录
 target_include_directories(llama PUBLIC 
-    ${PROJECT_SOURCE_DIR}/kuiper/include
+    ${PROJECT_SOURCE_DIR}/code/include
 )
 
 # 第三方库头文件目录

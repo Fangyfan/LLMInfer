@@ -91,7 +91,7 @@ int main(int argc, char* argv[]) {
     bool is_quant_model = false;
     model::Llama2Model model(base::TokenizerType::EncodeSpe, tokenizer_path, checkpoint_path, is_quant_model);
 
-    base::Status status = model.init(base::DeviceType::DeviceCPU);
+    base::Status status = model.init(base::DeviceType::DeviceCUDA);
     if (!status) {
         LOG(FATAL) << "The model init failed, the error code is: " << status.get_err_code() << std::endl;
     }
