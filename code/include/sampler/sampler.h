@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_SAMPLER_H
-#define KUIPER_INCLUDE_SAMPLER_H
+#ifndef CODE_INCLUDE_SAMPLER_H
+#define CODE_INCLUDE_SAMPLER_H
 
 #include "base/base.h"
 
@@ -10,11 +10,11 @@ public:
 
     // argmax 贪心采样: 模型输出的概率分布 logits，其长度为 size，输出概率最高的那个 token 的索引
     // 输入 logits = [-0.2, 2.3, 0.5, 1.8, -1.0]，输出为索引 1
-    virtual int32_t sample(const float* logits, int32_t size, void* stream = nullptr) const = 0;
+    virtual int32_t sample(const float* logits, int32_t size, int32_t* argmax_token, void* argmax_buffer, void* stream = nullptr) const = 0;
 
 protected:
     base::DeviceType device_type_ = base::DeviceType::DeviceUnknown;
 };
 }  // namespace sampler
 
-#endif  // KUIPER_INCLUDE_SAMPLER_H
+#endif  // CODE_INCLUDE_SAMPLER_H

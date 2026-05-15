@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_BASE_CUDA_CONFIG_H
-#define KUIPER_INCLUDE_BASE_CUDA_CONFIG_H
+#ifndef CODE_INCLUDE_BASE_CUDA_CONFIG_H
+#define CODE_INCLUDE_BASE_CUDA_CONFIG_H
 
 #include <cuda_runtime.h>
 #include <glog/logging.h>
@@ -21,4 +21,4 @@ struct CudaConfig {
 };
 }  // namespace kernel
 
-#endif  // KUIPER_INCLUDE_BASE_CUDA_CONFIG_H
+#endif  // CODE_INCLUDE_BASE_CUDA_CONFIG_H

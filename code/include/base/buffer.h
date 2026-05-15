@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_BASE_BUFFER_H
-#define KUIPER_INCLUDE_BASE_BUFFER_H
+#ifndef CODE_INCLUDE_BASE_BUFFER_H
+#define CODE_INCLUDE_BASE_BUFFER_H
 
 #include "base/alloc.h"
 
@@ -45,4 +45,4 @@ private:
 };
 }  // namespace base
 
-#endif  // KUIPER_INCLUDE_BASE_BUFFER_H
+#endif  // CODE_INCLUDE_BASE_BUFFER_H

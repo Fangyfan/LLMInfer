@@ -1,10 +1,8 @@
 #include "op/encode.h"
 #include "kernel/kernel_interface.h"
 
-#if defined(LLAMA3_SUPPORT) || defined(QWEN2_SUPPORT) || defined(QWEN3_SUPPORT)
 #include "base/unicode.h"
 #include <fstream>
-#endif
 
 namespace op {
 BaseEncodeLayer::BaseEncodeLayer(std::string tokenizer_path, bool has_bos, bool has_eos)
@@ -60,7 +58,6 @@ int32_t SpeEncodeLayer::vocab_size() const {
     return spe_->GetPieceSize();
 }
 
-#if defined(LLAMA3_SUPPORT) || defined(QWEN2_SUPPORT) || defined(QWEN3_SUPPORT)
 // BPE编码层的正则表达式模式，用于拆分文本
 const std::string PAT_STR = R"((?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?:$|[^\S])|\s+)";
 
@@ -228,5 +225,4 @@ QwenEncodeLayer::QwenEncodeLayer(std::string token_model_path, bool has_bos, boo
     // 创建 tiktoken 分词器实例（使用相同的正则表达式模式）
     tiktoken_ = std::make_unique<tiktoken::tiktoken>(encoder, special_tokens, PAT_STR);
 }
-#endif
 }  // namespace op

@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_OP_ADD_H
-#define KUIPER_INCLUDE_OP_ADD_H
+#ifndef CODE_INCLUDE_OP_ADD_H
+#define CODE_INCLUDE_OP_ADD_H
 
 #include "op/layer.h"
 
@@ -17,4 +17,4 @@ public:
 };
 }  // namespace op
 
-#endif  // KUIPER_INCLUDE_OP_ADD_H
+#endif  // CODE_INCLUDE_OP_ADD_H

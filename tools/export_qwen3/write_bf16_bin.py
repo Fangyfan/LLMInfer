@@ -12,6 +12,13 @@ def serialize_fp32(file, tensor):
     file.write(b)
 
 
+def serialize_bf16(file, tensor):
+    """ writes one bf16 tensor to file that is open in wb mode """
+    d = tensor.detach().cpu().contiguous().view(-1).to(torch.bfloat16)
+    u16 = d.view(torch.uint16).numpy()
+    file.write(u16.tobytes())
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Run Qwen3 in interactive mode.")
     parser.add_argument("-m", "--max_length", type=int, default=128, help="Maximum length of the generated output.")
@@ -60,7 +67,7 @@ def main():
 
     ## export
     version = 1
-    file_path = "/home/yifanfang/LLMInfer/models/qwen3/qwen3_0.6b_fp32.bin"
+    file_path = "/home/yifanfang/LLMInfer/models/qwen3/qwen3_0.6b_bf16.bin"
     out_file = open(file_path, 'wb')
 
     header = struct.pack('iiiiiiii', dim, hidden_dim, n_layers, n_heads,
@@ -68,7 +75,7 @@ def main():
     out_file.write(header)
 
     for w in weights:
-        serialize_fp32(out_file, w)
+        serialize_bf16(out_file, w)
 
     out_file.close()
     print(f"wrote {file_path}")

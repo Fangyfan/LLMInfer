@@ -72,13 +72,7 @@ base::Status Model::create_encode_layer() {
     if (tokenizer_type_ == base::TokenizerType::EncodeSpe) {
         encode_layer_ = std::make_unique<op::SpeEncodeLayer>(tokenizer_path_, true, false);
     } else {
-#ifdef LLAMA3_SUPPORT
-        encode_layer_ = std::make_unique<op::BpeEncodeLayer>(tokenizer_path_, true, false);
-#endif
-
-#if defined(QWEN2_SUPPORT) || defined(QWEN3_SUPPORT)
         encode_layer_ = std::make_unique<op::QwenEncodeLayer>(tokenizer_path_, false, false);
-#endif
     }
     if (!encode_layer_) {
         return base::error::internal_error("Create the encode layer failed.");
@@ -124,13 +118,8 @@ tensor::Tensor Model::get_embedding(const tensor::Tensor& token_pos, const op::E
         index = token_pos.index<int32_t>(0);
     }
     // 3. 零拷贝构造：创建一个 base::Buffer，让它直接指向 embedding_output 的内存地址（避免数据拷贝），然后封装成 Tensor 返回
-#ifdef QWEN3_SUPPORT
     float* ptr = const_cast<float*>(token_embeddings.ptr<float>(index * config_->hidden_dim));
     tensor::Tensor token_embedding(base::DataType::DataTypeFp32, config_->hidden_dim, false, nullptr, ptr);
-#else
-    float* ptr = const_cast<float*>(token_embeddings.ptr<float>(index * config_->dim));
-    tensor::Tensor token_embedding(base::DataType::DataTypeFp32, config_->dim, false, nullptr, ptr);
-#endif
     token_embedding.set_device_type(device_type_);
     return token_embedding;
 }
@@ -233,10 +222,8 @@ base::Status Model::generate_model_info(const ModelConfig& config) const {
     config_->hidden_dim = config.hidden_dim;
     config_->kv_head_num = config.kv_head_num;
     config_->layer_num = config.layer_num;
-    config_->max_seq_len = config.max_seq_len;
-#ifdef QWEN3_SUPPORT
+    config_->max_seq_len = std::min(config.max_seq_len, 2048);
     config_->immediate_dim = config.immediate_dim;
-#endif
     
     // 2. 计算 KV 参数 (kv_dim, kv_mul, head_dim)：这里包含了 GQA (Grouped Query Attention) 的逻辑
     CHECK(config_->dim % config_->head_num == 0);

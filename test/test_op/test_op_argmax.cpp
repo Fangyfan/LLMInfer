@@ -7,9 +7,12 @@
 #include "base/cuda_config.h"
 
 TEST(test_op_argmax, argmax_cuda_no_stream1) {
-    int32_t size = 32 * 15;
+    int32_t size = 151936;
     auto allocator_cpu = base::CPUDeviceAllocatorFactory::get_instance();
+    auto allocator_cu = base::CUDADeviceAllocatorFactory::get_instance();
     tensor::Tensor t_cpu(base::DataType::DataTypeFp32, size, true, allocator_cpu);
+    tensor::Tensor token_cu(base::DataType::DataTypeInt32, 1, true, allocator_cu);
+    tensor::Tensor buffer_cu(base::DataType::DataTypeInt32, 128 * 2, true, allocator_cu);
 
     t_cpu.index<float>(0) = 0;
     t_cpu.index<float>(1) = 1;
@@ -27,8 +30,8 @@ TEST(test_op_argmax, argmax_cuda_no_stream1) {
     auto sampler_cpu = std::make_unique<sampler::ArgmaxSampler>(base::DeviceType::DeviceCPU);
     auto sampler_cu = std::make_unique<sampler::ArgmaxSampler>(base::DeviceType::DeviceCUDA);
 
-    int32_t x = sampler_cpu->sample(t_cpu.ptr<float>(), t_cpu.size(), nullptr);
-    int32_t y = sampler_cu->sample(t_cu.ptr<float>(), t_cu.size(), nullptr);
+    int32_t x = sampler_cpu->sample(t_cpu.ptr<float>(), t_cpu.size(), token_cu.ptr<int32_t>(), buffer_cu.ptr<void>(), nullptr);
+    int32_t y = sampler_cu->sample(t_cu.ptr<float>(), t_cu.size(), token_cu.ptr<int32_t>(), buffer_cu.ptr<void>(), nullptr);
 
     ASSERT_EQ(x, y);
     ASSERT_EQ(x, 3);
@@ -36,9 +39,12 @@ TEST(test_op_argmax, argmax_cuda_no_stream1) {
 }
 
 TEST(test_op_argmax, argmax_cuda_no_stream2) {
-    int32_t size = 32 * 15;
+    int32_t size = 151936;
     auto allocator_cpu = base::CPUDeviceAllocatorFactory::get_instance();
+    auto allocator_cu = base::CUDADeviceAllocatorFactory::get_instance();
     tensor::Tensor t_cpu(base::DataType::DataTypeFp32, size, true, allocator_cpu);
+    tensor::Tensor token_cu(base::DataType::DataTypeInt32, 1, true, allocator_cu);
+    tensor::Tensor buffer_cu(base::DataType::DataTypeInt32, 128 * 2, true, allocator_cu);
 
     std::mt19937 mt(std::time(nullptr));
     std::uniform_real_distribution<float> dist(0.0f, 1.0f);
@@ -52,16 +58,19 @@ TEST(test_op_argmax, argmax_cuda_no_stream2) {
     auto sampler_cpu = std::make_unique<sampler::ArgmaxSampler>(base::DeviceType::DeviceCPU);
     auto sampler_cu = std::make_unique<sampler::ArgmaxSampler>(base::DeviceType::DeviceCUDA);
 
-    int32_t x = sampler_cpu->sample(t_cpu.ptr<float>(), t_cpu.size(), nullptr);
-    int32_t y = sampler_cu->sample(t_cu.ptr<float>(), t_cu.size(), nullptr);
+    int32_t x = sampler_cpu->sample(t_cpu.ptr<float>(), t_cpu.size(), token_cu.ptr<int32_t>(), buffer_cu.ptr<void>(), nullptr);
+    int32_t y = sampler_cu->sample(t_cu.ptr<float>(), t_cu.size(), token_cu.ptr<int32_t>(), buffer_cu.ptr<void>(), nullptr);
 
     ASSERT_EQ(x, y);
 }
 
 TEST(test_op_argmax, argmax_cuda_stream1) {
-    int32_t size = 32 * 15;
+    int32_t size = 151936;
     auto allocator_cpu = base::CPUDeviceAllocatorFactory::get_instance();
+    auto allocator_cu = base::CUDADeviceAllocatorFactory::get_instance();
     tensor::Tensor t_cpu(base::DataType::DataTypeFp32, size, true, allocator_cpu);
+    tensor::Tensor token_cu(base::DataType::DataTypeInt32, 1, true, allocator_cu);
+    tensor::Tensor buffer_cu(base::DataType::DataTypeInt32, 128 * 2, true, allocator_cu);
 
     std::mt19937 mt(std::time(nullptr));
     std::uniform_real_distribution<float> dist(0.0f, 1.0f);
@@ -79,16 +88,19 @@ TEST(test_op_argmax, argmax_cuda_stream1) {
     cuda_config->create();
     ASSERT_NE(cuda_config->stream, nullptr);
 
-    int32_t x = sampler_cpu->sample(t_cpu.ptr<float>(), t_cpu.size(), nullptr);
-    int32_t y = sampler_cu->sample(t_cu.ptr<float>(), t_cu.size(), cuda_config->stream);
+    int32_t x = sampler_cpu->sample(t_cpu.ptr<float>(), t_cpu.size(), token_cu.ptr<int32_t>(), buffer_cu.ptr<void>(), nullptr);
+    int32_t y = sampler_cu->sample(t_cu.ptr<float>(), t_cu.size(), token_cu.ptr<int32_t>(), buffer_cu.ptr<void>(), cuda_config->stream);
 
     ASSERT_EQ(x, y);
 }
 
 TEST(test_op_argmax, argmax_cuda_stream2) {
-    int32_t size = 32000;
+    int32_t size = 151936;
     auto allocator_cpu = base::CPUDeviceAllocatorFactory::get_instance();
+    auto allocator_cu = base::CUDADeviceAllocatorFactory::get_instance();
     tensor::Tensor t_cpu(base::DataType::DataTypeFp32, size, true, allocator_cpu);
+    tensor::Tensor token_cu(base::DataType::DataTypeInt32, 1, true, allocator_cu);
+    tensor::Tensor buffer_cu(base::DataType::DataTypeInt32, 128 * 2, true, allocator_cu);
 
     std::mt19937 mt(std::time(nullptr));
     std::uniform_real_distribution<float> dist(0.0f, 1.0f);
@@ -106,8 +118,8 @@ TEST(test_op_argmax, argmax_cuda_stream2) {
     cuda_config->create();
     ASSERT_NE(cuda_config->stream, nullptr);
 
-    int32_t x = sampler_cpu->sample(t_cpu.ptr<float>(), t_cpu.size(), nullptr);
-    int32_t y = sampler_cu->sample(t_cu.ptr<float>(), t_cu.size(), cuda_config->stream);
+    int32_t x = sampler_cpu->sample(t_cpu.ptr<float>(), t_cpu.size(), token_cu.ptr<int32_t>(), buffer_cu.ptr<void>(), nullptr);
+    int32_t y = sampler_cu->sample(t_cu.ptr<float>(), t_cu.size(), token_cu.ptr<int32_t>(), buffer_cu.ptr<void>(), cuda_config->stream);
 
     ASSERT_EQ(x, y);
 }

@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_MODEL_QWEN3_H_
-#define KUIPER_INCLUDE_MODEL_QWEN3_H_
+#ifndef CODE_INCLUDE_MODEL_QWEN3_H_
+#define CODE_INCLUDE_MODEL_QWEN3_H_
 
 #include "model.h"
 

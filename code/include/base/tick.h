@@ -1,5 +1,5 @@
-#ifndef KUIPER_INFER_INCLUDE_TICK_HPP_
-#define KUIPER_INFER_INCLUDE_TICK_HPP_
+#ifndef CODE_INFER_INCLUDE_TICK_HPP_
+#define CODE_INFER_INCLUDE_TICK_HPP_
 #include <chrono>
 #include <iostream>
 
@@ -14,4 +14,4 @@
 #define TICK(x)
 #define TOCK(x)
 #endif
-#endif  // KUIPER_INFER_INCLUDE_TICK_HPP_
+#endif  // CODE_INFER_INCLUDE_TICK_HPP_

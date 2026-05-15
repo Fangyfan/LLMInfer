@@ -1,10 +1,3 @@
-"""
-Qwen3 Model Implementation
-Author: Bound
-Date: May 14, 2025
-Version: 1.0
-"""
-
 import torch
 import torch.nn as nn
 from typing import Tuple

@@ -1,3 +1,4 @@
+#define QWEN3_SUPPORT
 #ifndef QWEN3_SUPPORT
 #include "model/config.h"
 #include "op/matmul.h"

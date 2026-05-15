@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_ARGMAX_SAMPLER_H
-#define KUIPER_INCLUDE_ARGMAX_SAMPLER_H
+#ifndef CODE_INCLUDE_ARGMAX_SAMPLER_H
+#define CODE_INCLUDE_ARGMAX_SAMPLER_H
 
 #include "sampler.h"
 
@@ -12,8 +12,8 @@ public:
     // 输入 logits = [-0.2, 2.3, 0.5, 1.8, -1.0]，输出为索引 1
     // logits: 模型输出的原始分数数组（未经过 softmax）
     // size: 数组大小，即词汇表大小
-    int32_t sample(const float* logits, int32_t size, void* stream) const override;
+    int32_t sample(const float* logits, int32_t size, int32_t* argmax_token, void* argmax_buffer, void* stream) const override;
 };
 }  // namespace sampler
 
-#endif  // KUIPER_INCLUDE_ARGMAX_SAMPLER_H
+#endif  // CODE_INCLUDE_ARGMAX_SAMPLER_H

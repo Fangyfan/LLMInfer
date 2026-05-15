@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_MODEL_RAW_MODEL_DATA_H
-#define KUIPER_INCLUDE_MODEL_RAW_MODEL_DATA_H
+#ifndef CODE_INCLUDE_MODEL_RAW_MODEL_DATA_H
+#define CODE_INCLUDE_MODEL_RAW_MODEL_DATA_H
 
 #include <cstdint>
 #include <cstddef>
@@ -26,4 +26,4 @@ struct RawModelDataInt8 : RawModelData {
 };
 }  // namespace model
 
-#endif  // KUIPER_INCLUDE_MODEL_RAW_MODEL_DATA_H
+#endif  // CODE_INCLUDE_MODEL_RAW_MODEL_DATA_H

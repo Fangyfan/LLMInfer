@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_MODEL_MODEL_H
-#define KUIPER_INCLUDE_MODEL_MODEL_H
+#ifndef CODE_INCLUDE_MODEL_MODEL_H
+#define CODE_INCLUDE_MODEL_MODEL_H
 
 #include "config.h"
 #include "op/encode.h"
@@ -63,7 +63,7 @@ protected:
     std::string tokenizer_path_; // tokenizer 文件路径
     std::string model_path_; // 模型权重文件路径
 
-    std::map<ModelBufferType, tensor::Tensor> buffers_; // 存储推理过程中各种数据 (如 KV Cache)
+    std::unordered_map<ModelBufferType, tensor::Tensor> buffers_; // 存储推理过程中各种数据 (如 KV Cache)
     std::unique_ptr<op::BaseEncodeLayer> encode_layer_; // encode 分词层 (sentence <=> token ids)
     std::unique_ptr<sampler::ArgmaxSampler> sampler_; // argmax 采样器
     std::unique_ptr<RawModelData> raw_model_data_; // 模型权重内存管理结构
@@ -74,4 +74,4 @@ protected:
 };
 }  // namespace model
 
-#endif  // KUIPER_INCLUDE_MODEL_MODEL_H
+#endif  // CODE_INCLUDE_MODEL_MODEL_H

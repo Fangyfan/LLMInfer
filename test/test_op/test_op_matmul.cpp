@@ -72,13 +72,14 @@ TEST(test_op_matmul, matmul_scale_fp32_cuda_stream) {
 
 TEST(test_op_matmul, matmul_fp32_cpu) {
     auto allocator_cpu = base::CPUDeviceAllocatorFactory::get_instance();
-    tensor::Tensor input_cpu(base::DataType::DataTypeFp32, 3, true, allocator_cpu);
-    tensor::Tensor weight_cpu(base::DataType::DataTypeFp32, 3, 3, true, allocator_cpu);
+    tensor::Tensor input_cpu(base::DataType::DataTypeFp32, 4, true, allocator_cpu);
+    tensor::Tensor weight_cpu(base::DataType::DataTypeFp32, 3, 4, true, allocator_cpu);
     tensor::Tensor output_cpu(base::DataType::DataTypeFp32, 3, true, allocator_cpu);
     
     input_cpu.index<float>(0) = 1.0f;
-    input_cpu.index<float>(1) = 1.0f;
+    input_cpu.index<float>(1) = -1.0f;
     input_cpu.index<float>(2) = -1.0f;
+    input_cpu.index<float>(3) = 1.0f;
     
     for (int32_t i = 0; i < weight_cpu.size(); ++i) {
         weight_cpu.index<float>(i) = float(i + 1);
@@ -86,24 +87,26 @@ TEST(test_op_matmul, matmul_fp32_cpu) {
     
     kernel::get_matmul_kernel(base::DeviceType::DeviceCPU)(input_cpu, weight_cpu, output_cpu, 1.0f, nullptr);
 
-    // [ 1 2 3 ]   [ 1 ]   [ 0 ]
-    // [ 4 5 6 ] × [ 1 ] = [ 3 ]
-    // [ 7 8 9 ]   [-1 ]   [ 6 ]
+    // [ 1  2  3  4 ]   [ 1 ]   [ 0 ]
+    // [ 5  6  7  8 ] × [-1 ] = [ 0 ]
+    // [ 9 10 11 12 ]   [-1 ]   [ 0 ]
+    //                  [ 1 ]
 
     ASSERT_EQ(output_cpu.index<float>(0), 0);
-    ASSERT_EQ(output_cpu.index<float>(1), 3);
-    ASSERT_EQ(output_cpu.index<float>(2), 6);
+    ASSERT_EQ(output_cpu.index<float>(1), 0);
+    ASSERT_EQ(output_cpu.index<float>(2), 0);
 }
 
 TEST(test_op_matmul, matmul_fp32_cuda_no_stream) {
     auto allocator_cpu = base::CPUDeviceAllocatorFactory::get_instance();
     auto allocator_cu = base::CUDADeviceAllocatorFactory::get_instance();
-    tensor::Tensor input_cu(base::DataType::DataTypeFp32, 3, true, allocator_cpu);
-    tensor::Tensor weight_cu(base::DataType::DataTypeFp32, 3, 3, true, allocator_cpu);
+    tensor::Tensor input_cu(base::DataType::DataTypeFp32, 4, true, allocator_cpu);
+    tensor::Tensor weight_cu(base::DataType::DataTypeFp32, 3, 4, true, allocator_cpu);
     
     input_cu.index<float>(0) = 1.0f;
-    input_cu.index<float>(1) = 1.0f;
+    input_cu.index<float>(1) = -1.0f;
     input_cu.index<float>(2) = -1.0f;
+    input_cu.index<float>(3) = 1.0f;
     
     for (int32_t i = 0; i < weight_cu.size(); ++i) {
         weight_cu.index<float>(i) = float(i + 1);
@@ -115,12 +118,13 @@ TEST(test_op_matmul, matmul_fp32_cuda_no_stream) {
     tensor::Tensor output_cu(base::DataType::DataTypeFp32, 3, true, allocator_cu);
     kernel::get_matmul_kernel(base::DeviceType::DeviceCUDA)(input_cu, weight_cu, output_cu, 1.0f, nullptr);
     
-    // [ 1 2 3 ]   [ 1 ]   [ 0 ]
-    // [ 4 5 6 ] × [ 1 ] = [ 3 ]
-    // [ 7 8 9 ]   [-1 ]   [ 6 ]
+    // [ 1  2  3  4 ]   [ 1 ]   [ 0 ]
+    // [ 5  6  7  8 ] × [-1 ] = [ 0 ]
+    // [ 9 10 11 12 ]   [-1 ]   [ 0 ]
+    //                  [ 1 ]
     
     output_cu.to_cpu();
     ASSERT_EQ(output_cu.index<float>(0), 0);
-    ASSERT_EQ(output_cu.index<float>(1), 3);
-    ASSERT_EQ(output_cu.index<float>(2), 6);
+    ASSERT_EQ(output_cu.index<float>(1), 0);
+    ASSERT_EQ(output_cu.index<float>(2), 0);
 }

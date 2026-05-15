@@ -1,16 +1,15 @@
-#ifndef KUIPER_INCLUDE_OP_ENCODE_H
-#define KUIPER_INCLUDE_OP_ENCODE_H
+#ifndef CODE_INCLUDE_OP_ENCODE_H
+#define CODE_INCLUDE_OP_ENCODE_H
 
 #include <sentencepiece_processor.h>
 #include "op/layer.h"
-#if defined (LLAMA3_SUPPORT) || defined (QWEN2_SUPPORT) || defined (QWEN3_SUPPORT)
+
 #include <absl/strings/str_join.h>
 #include <absl/strings/str_replace.h>
 #include <absl/strings/str_split.h>
 #include "base/tiktoken.h"
 #include "base/unordered_dense.h"
 #include "nlohmann/json.hpp"
-#endif
 
 namespace op {
 class BaseEncodeLayer : public Layer { // 接口层（抽象基类），解耦 tokenizer 的具体实现，允许未来支持 SentencePiece / SPE
@@ -50,7 +49,6 @@ private:
     std::unique_ptr<sentencepiece::SentencePieceProcessor> spe_; // SentencePiece 官方处理器 + RAII 管理资源
 };
 
-#if defined (LLAMA3_SUPPORT) || defined (QWEN2_SUPPORT) || defined (QWEN3_SUPPORT)
 class BpeEncodeLayer : public BaseEncodeLayer {
 public:
     explicit BpeEncodeLayer(std::string tokenizer_path, bool has_bos, bool has_eos);
@@ -73,8 +71,7 @@ class QwenEncodeLayer : public BpeEncodeLayer {
 public:
     explicit QwenEncodeLayer(std::string tokenizer_path, bool has_bos, bool has_eos);
 };
-#endif
 
 }  // namespace op
 
-#endif  // KUIPER_INCLUDE_OP_ENCODE_H
+#endif  // CODE_INCLUDE_OP_ENCODE_H

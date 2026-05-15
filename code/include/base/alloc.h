@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_BASE_ALLOC_H
-#define KUIPER_INCLUDE_BASE_ALLOC_H
+#ifndef CODE_INCLUDE_BASE_ALLOC_H
+#define CODE_INCLUDE_BASE_ALLOC_H
 
 #include <set>
 #include <map>
@@ -85,4 +85,4 @@ private:
 };
 }  // namespace base
 
-#endif  // KUIPER_INCLUDE_BASE_ALLOC_H
+#endif  // CODE_INCLUDE_BASE_ALLOC_H

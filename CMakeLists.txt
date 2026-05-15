@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
 
 # 项目定义
-project(llama_infer CXX CUDA)
+project(llm_infer CXX CUDA)
 
 # 包含CUDA相关配置
 include(cmake/cuda.cmake)
@@ -36,26 +36,8 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 # 项目特性选项
 # ============================================
 
-# LLAMA3模型支持选项
-option(LLAMA3_SUPPORT OFF)
-if(LLAMA3_SUPPORT)
-    message(STATUS "启用 LLAMA3 支持")
-    add_definitions(-DLLAMA3_SUPPORT)
-endif()
-
-# QWEN2模型支持选项
-option(QWEN2_SUPPORT OFF)
-if(QWEN2_SUPPORT)
-    message(STATUS "启用 QWEN2 支持")
-    add_definitions(-DQWEN2_SUPPORT)
-endif()
-
 # QWEN3模型支持选项
-option(QWEN3_SUPPORT OFF)
-if(QWEN3_SUPPORT)
-    message(STATUS "启用 QWEN3 支持")
-    add_definitions(-DQWEN3_SUPPORT)
-endif()
+message(STATUS "启用 QWEN3 支持")
 
 # ============================================
 # 查找必需包
@@ -93,11 +75,11 @@ aux_source_directory(code/source/sampler DIR_SAMPLE)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
 # ============================================
-# 主库目标定义：构建llama动态库
+# 主库目标定义：构建infer动态库
 # ============================================
 
 # 创建共享库
-add_library(llama SHARED 
+add_library(llm_infer SHARED 
     ${DIR_TENSOR}
     ${DIR_BASE}
     ${DIR_OP}
@@ -112,7 +94,7 @@ add_library(llama SHARED
 # 链接库依赖
 # ============================================
 
-target_link_libraries(llama
+target_link_libraries(llm_infer
     sentencepiece
     glog::glog
     gtest
@@ -123,19 +105,19 @@ target_link_libraries(llama
 )
 
 # 指定链接目录
-target_link_directories(llama PUBLIC ${CMAKE_CUDA_COMPILER_LIBRARY_ROOT}/lib64)
+target_link_directories(llm_infer PUBLIC ${CMAKE_CUDA_COMPILER_LIBRARY_ROOT}/lib64)
 
 # ============================================
 # 包含目录配置
 # ============================================
 
 # 项目头文件目录
-target_include_directories(llama PUBLIC 
+target_include_directories(llm_infer PUBLIC 
     ${PROJECT_SOURCE_DIR}/code/include
 )
 
 # 第三方库头文件目录
-target_include_directories(llama PUBLIC 
+target_include_directories(llm_infer PUBLIC 
     ${glog_INCLUDE_DIR}
     ${Armadillo_INCLUDE_DIR}
     ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
@@ -143,7 +125,7 @@ target_include_directories(llama PUBLIC
 
 # CPM特定包含目录
 if(USE_CPM)
-    target_include_directories(llama PUBLIC ${sentencepiece_SOURCE_DIR}/src)
+    target_include_directories(llm_infer PUBLIC ${sentencepiece_SOURCE_DIR}/src)
 endif()
 
 # ============================================
@@ -151,7 +133,7 @@ endif()
 # ============================================
 
 # 启用CUDA分离编译（提升编译速度，支持大型CUDA项目）
-set_target_properties(llama PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+set_target_properties(llm_infer PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 # ============================================
 # 子目录添加：构建测试和示例程序
@@ -161,13 +143,13 @@ set_target_properties(llama PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 add_subdirectory(test)
 
 # 演示代码目录
-add_subdirectory(demo)
+add_subdirectory(main)
 
 # ============================================
 # 添加编译选项
 # ============================================
 
 # 解决Armadillo伪GCC警告
-target_compile_definitions(llama PRIVATE
+target_compile_definitions(llm_infer PRIVATE
     ARMA_ALLOW_FAKE_GCC  # 允许Armadillo忽略伪GCC编译器检测
 )

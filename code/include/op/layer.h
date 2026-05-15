@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_OP_LAYER_H
-#define KUIPER_INCLUDE_OP_LAYER_H
+#ifndef CODE_INCLUDE_OP_LAYER_H
+#define CODE_INCLUDE_OP_LAYER_H
 
 #include "tensor/tensor.h"
 #include "base/cuda_config.h"
@@ -152,4 +152,4 @@ protected:
 };
 }  // namespace op
 
-#endif  // KUIPER_INCLUDE_OP_LAYER_H
+#endif  // CODE_INCLUDE_OP_LAYER_H

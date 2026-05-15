@@ -1,52 +1,91 @@
 #include "softmax_kernel.cuh"
-#include "cub/block/block_reduce.cuh"
-#include <cfloat>
 
 namespace kernel {
-template<int32_t THREAD_PER_BLOCK>
-static __global__ void softmax_kernel_fp32(float* __restrict__ x, int32_t size) {
-    using BlockReduce = cub::BlockReduce<float, THREAD_PER_BLOCK>;
-    __shared__ typename BlockReduce::TempStorage temp;
-    __shared__ float shared_val;
+struct __align__(8) MD {
+    float m;
+    float d;
+};
 
-    // 每个线程求自己负责的局部最大值
-    float max_val = -FLT_MAX;
-    for (int32_t i = threadIdx.x; i < size; i += blockDim.x) {
-        if (max_val < x[i]) {
-            max_val = x[i];
+static __device__ __forceinline__ MD merge(const MD& a, const MD& b) {
+    if (a.d == 0.0f) return b;
+    if (b.d == 0.0f) return a;
+
+    MD res;
+    res.m = fmaxf(a.m, b.m);
+    res.d = a.d * __expf(a.m - res.m) + b.d * __expf(b.m - res.m);
+    return res;
+}
+
+template <int WARP_SIZE>
+static __device__ __forceinline__ MD warp_reduce(MD val) {
+#pragma unroll
+    for (int32_t delta = (WARP_SIZE >> 1); delta > 0; delta >>= 1) {
+        val = merge(val, MD{
+            __shfl_down_sync(0xffffffff, val.m, delta, WARP_SIZE), 
+            __shfl_down_sync(0xffffffff, val.d, delta, WARP_SIZE)
+        });
+    }
+    return val;
+}
+
+template <int WARP_NUM>
+static __device__ __forceinline__ MD block_reduce(MD val) {
+    int32_t lane = threadIdx.x & 31;
+    int32_t warp = threadIdx.x >> 5;
+    __shared__ MD shared_vals[WARP_NUM];
+    __shared__ MD shared_val;
+    val = warp_reduce<32>(val);
+    if (lane == 0) {
+        shared_vals[warp] = val;
+    }
+    __syncthreads();
+    if (warp == 0) {
+        if (lane < WARP_NUM) {
+            val = shared_vals[lane];
         }
+        val = warp_reduce<WARP_NUM>(val);
     }
-
-    // 块级规约求全局最大值
-    max_val = BlockReduce(temp).Reduce(max_val, cub::Max());
-
-    // 通过块内共享变量，将全局最大值由 thread 0 广播到块内所有线程
     if (threadIdx.x == 0) {
-        shared_val = max_val;
+        shared_val = val;
     }
     __syncthreads();
-    max_val = shared_val;
+    val = shared_val;
+    return val;
+}
 
-    // 每个线程对自己负责的值更新: 减去全局最大值 x = (x - max)，以至于 exp 后数值稳定，并进行局部求和
-    float sum = 0.0f;
-    for (int32_t i = threadIdx.x; i < size; i += blockDim.x) {
-        x[i] = expf(x[i] - max_val);
-        sum += x[i];
+template <int32_t BLOCK_DIM>
+static __global__ void softmax_kernel_fp32(float* __restrict__ input, int32_t size) {
+    input += blockIdx.x * size;
+    int32_t size4 = size >> 2;
+    constexpr int32_t WARP_NUM = BLOCK_DIM >> 5;
+
+    MD md_temp[4], md_val;
+    md_val.m = -INFINITY;
+    md_val.d = 0.0f;
+
+    float4* in4 = reinterpret_cast<float4*>(input);
+    for (int32_t i = threadIdx.x; i < size4; i += blockDim.x) {
+        float4 v = in4[i];
+        md_temp[0] = {v.x, 1.0f};
+        md_temp[1] = {v.y, 1.0f};
+        md_temp[2] = {v.z, 1.0f};
+        md_temp[3] = {v.w, 1.0f};
+
+        md_val = merge(md_val, md_temp[0]);
+        md_val = merge(md_val, md_temp[1]);
+        md_val = merge(md_val, md_temp[2]);
+        md_val = merge(md_val, md_temp[3]);
     }
+    md_val = block_reduce<WARP_NUM>(md_val);
 
-    // 块级规约进行全局求和
-    sum = BlockReduce(temp).Reduce(sum, cub::Sum());
-
-    // 通过块内共享变量，将全局和由 thread 0 广播到块内所有线程
-    if (threadIdx.x == 0) {
-        shared_val = sum;
-    }
-    __syncthreads();
-    sum = shared_val;
-
-    // 每个线程对自己负责的值更新: 除以全局和，即 softmax(x) = e^{-x} / sum(e^{-x})
-    for (int32_t i = threadIdx.x; i < size; i += blockDim.x) {
-        x[i] /= sum;
+    for (int32_t i = threadIdx.x; i < size4; i += blockDim.x) {
+        float4 v = in4[i];
+        in4[i] = make_float4(
+            __expf(v.x - md_val.m) / md_val.d,
+            __expf(v.y - md_val.m) / md_val.d,
+            __expf(v.z - md_val.m) / md_val.d,
+            __expf(v.w - md_val.m) / md_val.d
+        );
     }
 }
 
@@ -56,18 +95,12 @@ void softmax_kernel_cu(const tensor::Tensor& input, void* stream) {
 
     float* in = const_cast<float*>(input.ptr<float>());
     const int32_t size = static_cast<int32_t>(input.size());
-    
-    constexpr int32_t block_num = 1;
+
+    CHECK(size % 4 == 0);
+
+    dim3 gridDim(1);
+    dim3 blockDim(256);
     cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
-    if (size < 256) {
-        constexpr int32_t thread_num = 128;
-        softmax_kernel_fp32<thread_num><<<block_num, thread_num, 0, stream_>>>(in, size);
-    } else if (size < 512) {
-        constexpr int32_t thread_num = 256;
-        softmax_kernel_fp32<thread_num><<<block_num, thread_num, 0, stream_>>>(in, size);
-    } else {
-        constexpr int32_t thread_num = 512;
-        softmax_kernel_fp32<thread_num><<<block_num, thread_num, 0, stream_>>>(in, size);
-    }
+    softmax_kernel_fp32<256><<<gridDim, blockDim, 0, stream_>>>(in, size);
 }
 }  // namespace kernel

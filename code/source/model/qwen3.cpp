@@ -1,4 +1,3 @@
-#ifdef QWEN3_SUPPORT
 #include "model/qwen3.h"
 #include "op/add.h"
 #include "op/matmul.h"
@@ -420,6 +419,11 @@ void Qwen3Model::allocate_model_buffers() {
 
     tensor::Tensor logits(base::DataType::DataTypeFp32, vocab_size, true, allocator);
     insert_buffer(ModelBufferType::Logits, logits);
+
+    tensor::Tensor argmax_token(base::DataType::DataTypeInt32, 1, true, allocator);
+    tensor::Tensor argmax_buffer(base::DataType::DataTypeInt32, 128 * 2, true, allocator);
+    insert_buffer(ModelBufferType::ArgmaxToken, argmax_token);
+    insert_buffer(ModelBufferType::ArgmaxBuffer, argmax_buffer);
 }
 
 void Qwen3Model::attention_rmsnorm(int32_t layer_id, const tensor::Tensor& input) const {
@@ -530,10 +534,16 @@ int32_t Qwen3Model::post_process(bool is_prompt) const {
     }
     // 2. 生成阶段：调用 sampler_->sample，根据策略 argmax 选最大的挑出下一个 token id
     const tensor::Tensor& logits = get_buffer(ModelBufferType::Logits);
+    const tensor::Tensor& argmax_token = get_buffer(ModelBufferType::ArgmaxToken);
+    const tensor::Tensor& argmax_buffer = get_buffer(ModelBufferType::ArgmaxBuffer);
     CHECK_EQ(logits.size(), config_->vocab_size);
-    int32_t next_token_id = sampler_->sample(logits.ptr<float>(), logits.size(), cuda_config_ ? cuda_config_->stream : nullptr);
+    int32_t next_token_id = sampler_->sample(
+        logits.ptr<float>(), 
+        logits.size(), 
+        const_cast<int32_t*>(argmax_token.ptr<int32_t>()), 
+        const_cast<void*>(argmax_buffer.ptr<void>()), 
+        cuda_config_ ? cuda_config_->stream : nullptr
+    );
     return next_token_id;
 }
 }  // namespace model
-
-#endif

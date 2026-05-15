@@ -1,5 +1,5 @@
-#ifndef LLAMA_INFER_INCLUDE_OP_SWIGLU_H
-#define LLAMA_INFER_INCLUDE_OP_SWIGLU_H
+#ifndef CODE_INFER_INCLUDE_OP_SWIGLU_H
+#define CODE_INFER_INCLUDE_OP_SWIGLU_H
 
 #include "op/layer.h"
 
@@ -21,4 +21,4 @@ private:
 };
 }  // namespace op
 
-#endif  // LLAMA_INFER_INCLUDE_OP_SWIGLU_H
+#endif  // CODE_INFER_INCLUDE_OP_SWIGLU_H

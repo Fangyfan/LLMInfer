@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_BASE_BASE_H
-#define KUIPER_INCLUDE_BASE_BASE_H
+#ifndef CODE_INCLUDE_BASE_BASE_H
+#define CODE_INCLUDE_BASE_BASE_H
 
 #include <glog/logging.h>
 #include <cstdint>
@@ -27,6 +27,8 @@ enum class ModelBufferType : uint8_t {
     FFNW2Output = 14,       // FFN 下降投影层 Down Projection (将维度映射回 dim)
     FFNW3Output = 15,       // FFN 上升投影层 Up Projection (通常与 Gate 做点乘)
     Logits = 16,            // 词表原始分数分布 Logits
+    ArgmaxToken = 17,       // 贪心采样 token id
+    ArgmaxBuffer = 18,      // 贪心采样中间结果缓存 buffer
 };
 }  // namespace model
 
@@ -40,8 +42,8 @@ enum class DeviceType : uint8_t {
 enum class DataType : uint8_t {
     DataTypeUnknown = 0,
     DataTypeFp32 = 1,    // 单精度浮点
-    DataTypeInt8 = 2,    // 8 位整数（量化）
-    DataTypeInt32 = 3,   // 32 位整数
+    DataTypeInt32 = 2,   // 32 位整数
+    DataTypeInt8 = 3,    // 8 位整数（量化）
 };
 
 enum class ModelType : uint8_t {
@@ -53,10 +55,10 @@ enum class ModelType : uint8_t {
 inline size_t data_type_size(DataType data_type) {
     if (data_type == DataType::DataTypeFp32) {
         return sizeof(float);
-    } else if (data_type == DataType::DataTypeInt8) {
-        return sizeof(int8_t);
     } else if (data_type == DataType::DataTypeInt32) {
         return sizeof(int32_t);
+    } else if (data_type == DataType::DataTypeInt8) {
+        return sizeof(int8_t);
     } else {
         LOG(FATAL) << "Unknown data type size for " << int(data_type) << std::endl;
         return 0;
@@ -137,4 +139,4 @@ Status invalid_argument(const std::string& err_msg = "");
 std::ostream& operator<<(std::ostream& os, const Status& status);
 }  // namespace base
 
-#endif  // KUIPER_INCLUDE_BASE_BASE_H
+#endif  // CODE_INCLUDE_BASE_BASE_H

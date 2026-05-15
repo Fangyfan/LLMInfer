@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_TENSOR_TENSOR_H
-#define KUIPER_INCLUDE_TENSOR_TENSOR_H
+#ifndef CODE_INCLUDE_TENSOR_TENSOR_H
+#define CODE_INCLUDE_TENSOR_TENSOR_H
 
 #include <cuda_runtime_api.h>
 #include "base/buffer.h"
@@ -131,4 +131,4 @@ const T& Tensor::index(int64_t offset) const {
 
 }  // namespace tensor
 
-#endif  // KUIPER_INCLUDE_TENSOR_TENSOR_H
+#endif  // CODE_INCLUDE_TENSOR_TENSOR_H

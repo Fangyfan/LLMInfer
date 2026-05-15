@@ -1,5 +1,5 @@
-#ifndef KUIPER_INLCUDE_MHA_H
-#define KUIPER_INLCUDE_MHA_H
+#ifndef CODE_INLCUDE_MHA_H
+#define CODE_INLCUDE_MHA_H
 
 #include "op/layer.h"
 
@@ -26,4 +26,4 @@ private:
 };
 }  // namespace op
 
-#endif  // KUIPER_INLCUDE_MHA_H
+#endif  // CODE_INLCUDE_MHA_H

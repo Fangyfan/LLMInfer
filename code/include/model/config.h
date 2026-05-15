@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_MODEL_CONFIG_H_
-#define KUIPER_INCLUDE_MODEL_CONFIG_H_
+#ifndef CODE_INCLUDE_MODEL_CONFIG_H_
+#define CODE_INCLUDE_MODEL_CONFIG_H_
 
 #include <cstdint>
 
@@ -12,9 +12,7 @@ struct ModelConfig {
     int32_t kv_head_num = 0;    // 分组注意力的 KV 头数
     int32_t vocab_size = 0;     // 词表大小
     int32_t max_seq_len = 0;    // 模型能处理的最长文本长度
-#ifdef QWEN3_SUPPORT
     int32_t immediate_dim = 0;  // 在 Qwen3 中 FFN-SwiGLU 隐藏层中间维度
-#endif
 };
 
 struct TransformerConfig {
@@ -29,10 +27,8 @@ struct TransformerConfig {
     int32_t kv_head_num = 0;    // 分组注意力的 KV 头的数量
     int32_t max_seq_len = 0;    // 模型能处理的最长文本长度
     bool is_shared_weight = false;  // Embedding 层 (vocab_size, dim) 和 Output 层 (dim, vocab_size) 是否共享权重
-#ifdef QWEN3_SUPPORT
     int32_t immediate_dim = 0;  // 在 Qwen3 中 FFN-SwiGLU 隐藏层中间维度
-#endif
 };
 }  // namespace model
 
-#endif  // KUIPER_INCLUDE_MODEL_CONFIG_H_
+#endif  // CODE_INCLUDE_MODEL_CONFIG_H_

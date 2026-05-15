@@ -1,5 +1,5 @@
-#ifndef KUIPER_INCLUDE_OP_RMSNORM_H
-#define KUIPER_INCLUDE_OP_RMSNORM_H
+#ifndef CODE_INCLUDE_OP_RMSNORM_H
+#define CODE_INCLUDE_OP_RMSNORM_H
 
 #include "op/layer.h"
 
@@ -20,4 +20,4 @@ private:
 };
 }  // namespace op
 
-#endif  // KUIPER_INCLUDE_OP_RMSNORM_H
+#endif  // CODE_INCLUDE_OP_RMSNORM_H

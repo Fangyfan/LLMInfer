@@ -1,10 +1,3 @@
-"""
-Qwen3 Model Configuration
-Author: Bound
-Date: May 1, 2025
-Version: 1.0
-"""
-
 import torch
 
 class Qwen3Config:
