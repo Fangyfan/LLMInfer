@@ -222,7 +222,7 @@ base::Status Model::generate_model_info(const ModelConfig& config) const {
     config_->hidden_dim = config.hidden_dim;
     config_->kv_head_num = config.kv_head_num;
     config_->layer_num = config.layer_num;
-    config_->max_seq_len = std::min(config.max_seq_len, 2048);
+    config_->max_seq_len = std::min(config.max_seq_len, 4096);
     config_->immediate_dim = config.immediate_dim;
     
     // 2. 计算 KV 参数 (kv_dim, kv_mul, head_dim)：这里包含了 GQA (Grouped Query Attention) 的逻辑

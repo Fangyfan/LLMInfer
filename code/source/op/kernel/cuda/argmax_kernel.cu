@@ -52,7 +52,7 @@ struct __align__(8) val_idx {
 };
 
 template <int32_t BLOCK_DIM>
-static __global__ void argmax_kernel_1(
+static __global__ __launch_bounds__(BLOCK_DIM) void argmax_kernel_1(
     const float* __restrict__ input,
     int32_t size,
     val_idx* __restrict__ temp

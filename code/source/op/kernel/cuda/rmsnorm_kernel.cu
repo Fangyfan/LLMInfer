@@ -32,7 +32,7 @@ static __device__ __forceinline__ float block_reduce_sum(float val) {
 }
 
 template <int32_t BLOCK_DIM>
-static __global__ void rmsnorm_kernel_fp32(
+static __global__ __launch_bounds__(BLOCK_DIM) void rmsnorm_kernel_fp32(
     const float* in, 
     const float* __restrict__ wei, 
     float* out, 
@@ -103,7 +103,7 @@ void rmsnorm_kernel_cu(
 }
 
 template <int32_t BLOCK_DIM>
-static __global__ void rmsnorm_2d_kernel_fp32(
+static __global__ __launch_bounds__(BLOCK_DIM) void rmsnorm_2d_kernel_fp32(
     const float* in, 
     const float* __restrict__ wei, 
     float* out, 

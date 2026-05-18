@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
 
     double TTFT = 0.0f;
     double TPOT = 0.0f;
-    const int32_t total_steps = 2560;
+    const int32_t total_steps = 4096;
     int32_t steps = generate(model, sentence, total_steps, TTFT, TPOT, true);
 
     auto end = std::chrono::steady_clock().now();

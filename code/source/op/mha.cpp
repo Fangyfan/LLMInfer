@@ -15,19 +15,19 @@ base::Status MultiHeadAttention::check() const {
         LOG(ERROR) << "The input query tensor error in the matmul layer." << std::endl;
         return status;
     }
-    status = check_tensor_with_dim(get_input(1), device_type_, data_type_, head_num_, max_seq_len_);
-    if (!status) {
-        LOG(ERROR) << "The input score tensor error in the matmul layer." << std::endl;
-        return status;
-    }
-    status = check_tensor(get_input(2), device_type_, data_type_);
+    status = check_tensor(get_input(1), device_type_, data_type_);
     if (!status) {
         LOG(ERROR) << "The input key_cache tensor error in the matmul layer." << std::endl;
         return status;
     }
-    status = check_tensor(get_input(3), device_type_, data_type_);
+    status = check_tensor(get_input(2), device_type_, data_type_);
     if (!status) {
         LOG(ERROR) << "The input value_cache tensor error in the matmul layer." << std::endl;
+        return status;
+    }
+    status = check_tensor_with_dim(get_input(3), device_type_, data_type_, head_num_, 4 * max_seq_len_);
+    if (!status) {
+        LOG(ERROR) << "The input kv_split_output tensor error in the matmul layer." << std::endl;
         return status;
     }
     status = check_tensor_with_dim(get_output(0), device_type_, data_type_, head_num_ * head_dim_);
@@ -44,14 +44,14 @@ base::Status MultiHeadAttention::forward() {
         return status;
     }
     const tensor::Tensor& query = get_input(0);
-    const tensor::Tensor& score = get_input(1);
-    const tensor::Tensor& key_cache = get_input(2);
-    const tensor::Tensor& value_cache = get_input(3);
+    const tensor::Tensor& key_cache = get_input(1);
+    const tensor::Tensor& value_cache = get_input(2);
+    const tensor::Tensor& kv_split_output = get_input(3);
     const tensor::Tensor& output = get_output(0);
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         CHECK_NE(cuda_config_, nullptr);
     }
-    kernel::get_mha_kernel(device_type_)(query, score, key_cache, value_cache, output, 
+    kernel::get_mha_kernel(device_type_)(query, key_cache, value_cache, kv_split_output, output, 
                                          layer_id_, pos_, kv_dim_, kv_mul_, head_num_, head_dim_, max_seq_len_, 
                                          cuda_config_ ? cuda_config_->stream : nullptr);
     return base::error::success();

@@ -403,8 +403,8 @@ void Qwen3Model::allocate_model_buffers() {
     tensor::Tensor query(base::DataType::DataTypeFp32, dim, true, allocator);
     insert_buffer(ModelBufferType::Query, query);
 
-    tensor::Tensor score(base::DataType::DataTypeFp32, head_num, max_seq_len, true, allocator);
-    insert_buffer(ModelBufferType::AttentionScore, score);
+    tensor::Tensor kv_split_output(base::DataType::DataTypeFp32, head_num, 4 * max_seq_len, true, allocator);
+    insert_buffer(ModelBufferType::KVSplitOutput, kv_split_output);
 
     tensor::Tensor mha_out(base::DataType::DataTypeFp32, dim, true, allocator);
     insert_buffer(ModelBufferType::MHAOutput, mha_out);
@@ -483,9 +483,9 @@ void Qwen3Model::attention_mha(int32_t layer_id, const tensor::Tensor& token_pos
 
     // 3. 计算 MHA: Attention(Q, K, V) = (softmax QK^T / sqrt(d)) V
     const tensor::Tensor& query = get_buffer(ModelBufferType::Query);
-    const tensor::Tensor& score = get_buffer(ModelBufferType::AttentionScore);
+    const tensor::Tensor& kv_split_output = get_buffer(ModelBufferType::KVSplitOutput);
     const tensor::Tensor& output = get_buffer(ModelBufferType::MHAOutput);
-    STATUS_CHECK(qwen3_layers_->mha_layer_->forward(query, score, key_cache, value_cache, output));
+    STATUS_CHECK(qwen3_layers_->mha_layer_->forward(query, key_cache, value_cache, kv_split_output, output));
 
     // 4. 输出投影: 计算出的结果再经过一个 wo (Output Weight) 线性层
     const auto& wo_layer = qwen3_layers_->wo_layers_.at(layer_id);

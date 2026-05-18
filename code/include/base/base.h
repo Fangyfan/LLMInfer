@@ -19,7 +19,7 @@ enum class ModelBufferType : uint8_t {
     Query = 6,              // 注意力机制 Query 向量
     KeyCache = 7,           // 注意力机制 Key Cache
     ValueCache = 8,         // 注意力机制 Value Cache
-    AttentionScore = 9,     // 注意力分数: (softmax (QK^T)/sqrt(d))
+    KVSplitOutput = 9,      // 在 FlashDecoding 中 kv-split 的局部结果 (m, l, o)
     MHAOutput = 10,         // 多头注意力输出: (softmax (QK^T)/sqrt(d)) V
     AttentionOuput = 11,    // 注意力机制最终经过 Wo 映射输出: MHA * Wo
     FFNPreRMSNorm = 12,     // 每个 Transformer Block 中执行 FFN 之前的 RMSNorm 结果

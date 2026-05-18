@@ -38,7 +38,7 @@ static __device__ __forceinline__ float block_reduce_sum(float val) {
 }
 
 template <int32_t BLOCK_DIM>
-static __global__ void matmul_kernel_fp32(
+static __global__ __launch_bounds__(BLOCK_DIM) void matmul_kernel_fp32(
     const float* __restrict__ in,    // [N, 1]
     const float* __restrict__ wei,   // [M, N]
     float* __restrict__ out,         // [M, 1]
