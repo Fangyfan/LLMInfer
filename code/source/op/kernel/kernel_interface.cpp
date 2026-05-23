@@ -22,10 +22,10 @@
 
 namespace kernel {
 AddKernel get_add_kernel(base::DeviceType device_type) {
-    if (device_type == base::DeviceType::DeviceCPU) {
-        return add_kernel_cpu;
-    } else if (device_type == base::DeviceType::DeviceCUDA) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
         return add_kernel_cu;
+    } else if (device_type == base::DeviceType::DeviceCPU) {
+        return add_kernel_cpu;
     } else {
         LOG(FATAL) << "Unknown device type for get a add kernel." << std::endl;
         return nullptr;
@@ -33,10 +33,19 @@ AddKernel get_add_kernel(base::DeviceType device_type) {
 }
 
 RMSNormKernel get_rmsnorm_kernel(base::DeviceType device_type) {
-    if (device_type == base::DeviceType::DeviceCPU) {
-        return rmsnorm_kernel_cpu;
-    } else if (device_type == base::DeviceType::DeviceCUDA) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
         return rmsnorm_kernel_cu;
+    } else if (device_type == base::DeviceType::DeviceCPU) {
+        return rmsnorm_kernel_cpu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a rmsnorm kernel." << std::endl;
+        return nullptr;
+    }
+}
+
+FusedAddRMSNormKernel get_fused_add_rmsnorm_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
+        return fused_add_rmsnorm_kernel_cu;
     } else {
         LOG(FATAL) << "Unknown device type for get a rmsnorm kernel." << std::endl;
         return nullptr;
@@ -52,20 +61,29 @@ RMSNorm2DKernel get_rmsnorm_2d_kernel(base::DeviceType device_type) {
     }
 }
 
-MatmulKernel get_matmul_kernel(base::DeviceType device_type) {
-    if (device_type == base::DeviceType::DeviceCPU) {
+GEMVKernel get_gemv_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
+        return gemv_kernel_cu;
+    } else if (device_type == base::DeviceType::DeviceCPU) {
         return matmul_kernel_cpu;
-    } else if (device_type == base::DeviceType::DeviceCUDA) {
-        return matmul_kernel_cu;
     } else {
         LOG(FATAL) << "Unknown device type for get a matmul kernel." << std::endl;
         return nullptr;
     }
 }
 
-MatmulKernelQuant get_matmul_kernel_quant8(base::DeviceType device_type) {
+FusedGEMVAddKernel get_fused_gemv_add_kernel(base::DeviceType device_type) {
     if (device_type == base::DeviceType::DeviceCUDA) {
-        return matmul_kernel_cu_quant8;
+        return fused_gemv_add_kernel_cu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a matmul kernel." << std::endl;
+        return nullptr;
+    }
+}
+
+GEMVInt8Kernel get_gemv_int8_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
+        return gemv_int8_kernel_cu;
     } else {
         LOG(FATAL) << "Unknown device type for get a quant8 matmul kernel." << std::endl;
         return nullptr;
@@ -73,10 +91,10 @@ MatmulKernelQuant get_matmul_kernel_quant8(base::DeviceType device_type) {
 }
 
 SwigluKernel get_swiglu_kernel(base::DeviceType device_type) {
-    if (device_type == base::DeviceType::DeviceCPU) {
-        return swiglu_kernel_cpu;
-    } else if (device_type == base::DeviceType::DeviceCUDA) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
         return swiglu_kernel_cu;
+    } else if (device_type == base::DeviceType::DeviceCPU) {
+        return swiglu_kernel_cpu;
     } else {
         LOG(FATAL) << "Unknown device type for get a swiglu kernel." << std::endl;
         return nullptr;
@@ -84,10 +102,10 @@ SwigluKernel get_swiglu_kernel(base::DeviceType device_type) {
 }
 
 EmbeddingKernel get_embedding_kernel(base::DeviceType device_type) {
-    if (device_type == base::DeviceType::DeviceCPU) {
-        return embedding_kernel_cpu;
-    } else if (device_type == base::DeviceType::DeviceCUDA) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
         return embedding_kernel_cu;
+    } else if (device_type == base::DeviceType::DeviceCPU) {
+        return embedding_kernel_cpu;
     } else {
         LOG(FATAL) << "Unknown device type for get a embedding kernel." << std::endl;
         return nullptr;
@@ -95,10 +113,10 @@ EmbeddingKernel get_embedding_kernel(base::DeviceType device_type) {
 }
 
 SinCosCacheKernel get_sin_cos_cache_kernel(base::DeviceType device_type) {
-    if (device_type == base::DeviceType::DeviceCPU) {
-        return sin_cos_cache_precompute_cpu;
-    } else if (device_type == base::DeviceType::DeviceCUDA) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
         return sin_cos_cache_precompute_cu;
+    } else if (device_type == base::DeviceType::DeviceCPU) {
+        return sin_cos_cache_precompute_cpu;
     } else {
         LOG(FATAL) << "Unknown device type for get a sin/cos cache precompute kernel." << std::endl;
         return nullptr;
@@ -106,10 +124,10 @@ SinCosCacheKernel get_sin_cos_cache_kernel(base::DeviceType device_type) {
 }
 
 RoPEKernel get_rope_kernel(base::DeviceType device_type) {
-    if (device_type == base::DeviceType::DeviceCPU) {
-        return rope_kernel_cpu;
-    } else if (device_type == base::DeviceType::DeviceCUDA) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
         return rope_kernel_cu;
+    } else if (device_type == base::DeviceType::DeviceCPU) {
+        return rope_kernel_cpu;
     } else {
         LOG(FATAL) << "Unknown device type for get a rope kernel." << std::endl;
         return nullptr;
@@ -117,10 +135,10 @@ RoPEKernel get_rope_kernel(base::DeviceType device_type) {
 }
 
 MHAKernel get_mha_kernel(base::DeviceType device_type) {
-    if (device_type == base::DeviceType::DeviceCPU) {
-        return mha_kernel_cpu;
-    } else if (device_type == base::DeviceType::DeviceCUDA) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
         return mha_kernel_cu;
+    } else if (device_type == base::DeviceType::DeviceCPU) {
+        return mha_kernel_cpu;
     } else {
         LOG(FATAL) << "Unknown device type for get a mha kernel." << std::endl;
         return nullptr;
@@ -128,10 +146,10 @@ MHAKernel get_mha_kernel(base::DeviceType device_type) {
 }
 
 SoftmaxKernel get_softmax_kernel(base::DeviceType device_type) {
-    if (device_type == base::DeviceType::DeviceCPU) {
-        return softmax_kernel_cpu;
-    } else if (device_type == base::DeviceType::DeviceCUDA) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
         return softmax_kernel_cu;
+    } else if (device_type == base::DeviceType::DeviceCPU) {
+        return softmax_kernel_cpu;
     } else {
         LOG(FATAL) << "Unknown device type for get a softmax kernel." << std::endl;
         return nullptr;

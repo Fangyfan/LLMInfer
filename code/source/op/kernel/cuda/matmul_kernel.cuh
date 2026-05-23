@@ -4,7 +4,7 @@
 #include "tensor/tensor.h"
 
 namespace kernel {
-void matmul_kernel_cu(
+void gemv_kernel_cu(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 
     const tensor::Tensor& output, 
@@ -12,7 +12,14 @@ void matmul_kernel_cu(
     void* stream
 );
 
-void matmul_kernel_cu_quant8(
+void fused_gemv_add_kernel_cu(
+    const tensor::Tensor& input, 
+    const tensor::Tensor& weight, 
+    const tensor::Tensor& output, 
+    void* stream
+);
+
+void gemv_int8_kernel_cu(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 
     const tensor::Tensor& output, 

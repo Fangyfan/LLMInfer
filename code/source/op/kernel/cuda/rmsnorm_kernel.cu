@@ -13,10 +13,8 @@ static __device__ __forceinline__ float warp_reduce_sum(float val) {
 template <int32_t WARP_NUM>
 static __device__ __forceinline__ float block_reduce_sum(float val) {
     __shared__ float shared_vals[WARP_NUM];
-    
     int32_t lane = threadIdx.x & 31;
     int32_t warp = threadIdx.x >> 5;
-
     val = warp_reduce_sum<32>(val);
     if (lane == 0) {
         shared_vals[warp] = val;
@@ -32,7 +30,7 @@ static __device__ __forceinline__ float block_reduce_sum(float val) {
 }
 
 template <int32_t BLOCK_DIM>
-static __global__ __launch_bounds__(BLOCK_DIM) void rmsnorm_kernel_fp32(
+static __global__ __launch_bounds__(BLOCK_DIM) void rmsnorm_kernel(
     const float* in, 
     const float* __restrict__ wei, 
     float* out, 
@@ -88,22 +86,91 @@ void rmsnorm_kernel_cu(
     const float* wei = weight.ptr<float>();
     float* out = const_cast<float*>(output.ptr<float>());
     int32_t size = static_cast<int32_t>(input.size());
-
-#if defined(QWEN2_SUPPORT) || defined(QWEN3_SUPPORT)
     constexpr float eps = 1e-6f;
-#else
-    constexpr float eps = 1e-5f;
-#endif
 
     CHECK(size % 4 == 0);
     dim3 gridDim(1);
     dim3 blockDim(256);
     cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
-    rmsnorm_kernel_fp32<256><<<gridDim, blockDim, 0, stream_>>>(in, wei, out, size, eps);
+    rmsnorm_kernel<256><<<gridDim, blockDim, 0, stream_>>>(in, wei, out, size, eps);
 }
 
 template <int32_t BLOCK_DIM>
-static __global__ __launch_bounds__(BLOCK_DIM) void rmsnorm_2d_kernel_fp32(
+static __global__ __launch_bounds__(BLOCK_DIM) void fused_add_rmsnorm_kernel(
+    const float* in, 
+    const float* __restrict__ add, 
+    const float* __restrict__ wei, 
+    float* out, 
+    int32_t size, 
+    float eps
+) {
+    constexpr int32_t WARP_NUM = (BLOCK_DIM >> 5);
+    const float4* in4 = reinterpret_cast<const float4*>(in);
+    const float4* add4 = reinterpret_cast<const float4*>(add);
+    const float4* wei4 = reinterpret_cast<const float4*>(wei);
+    float4* out4 = reinterpret_cast<float4*>(out);
+    int32_t size4 = size >> 2;
+    
+    float sum = 0.0f;
+    for (int32_t i = threadIdx.x; i < size4; i += blockDim.x) {
+        float4 a = in4[i];
+        float4 b = add4[i];
+        sum += (a.x + b.x) * (a.x + b.x) + (a.y + b.y) * (a.y + b.y) + (a.z + b.z) * (a.z + b.z) + (a.w + b.w) * (a.w + b.w);
+    }
+    sum = block_reduce_sum<WARP_NUM>(sum);
+
+    __shared__ float shared_scale;
+    if (threadIdx.x == 0) {
+        shared_scale = rsqrtf(sum / size + eps);
+    }
+    __syncthreads();
+    float scale = shared_scale;
+
+    for (int32_t i = threadIdx.x; i < size4; i += blockDim.x) {
+        float4 a = in4[i];
+        float4 b = add4[i];
+        float4 c = wei4[i];
+        out4[i] = make_float4(
+            (a.x + b.x) * c.x * scale, 
+            (a.y + b.y) * c.y * scale, 
+            (a.z + b.z) * c.z * scale, 
+            (a.w + b.w) * c.w * scale
+        );
+    }
+}
+
+void fused_add_rmsnorm_kernel_cu(
+    const tensor::Tensor& input, 
+    const tensor::Tensor& residual_add, 
+    const tensor::Tensor& weight, 
+    const tensor::Tensor& output, 
+    void* stream
+) {
+    CHECK(!input.is_empty());
+    CHECK(!residual_add.is_empty());
+    CHECK(!weight.is_empty());
+    CHECK(!output.is_empty());
+    CHECK(input.device_type() == base::DeviceType::DeviceCUDA);
+    CHECK(residual_add.device_type() == base::DeviceType::DeviceCUDA);
+    CHECK(weight.device_type() == base::DeviceType::DeviceCUDA);
+    CHECK(output.device_type() == base::DeviceType::DeviceCUDA);
+
+    const float* in = input.ptr<float>();
+    const float* add = residual_add.ptr<float>();
+    const float* wei = weight.ptr<float>();
+    float* out = const_cast<float*>(output.ptr<float>());
+    int32_t size = static_cast<int32_t>(input.size());
+    constexpr float eps = 1e-6f;
+
+    CHECK(size % 4 == 0);
+    dim3 gridDim(1);
+    dim3 blockDim(256);
+    cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
+    fused_add_rmsnorm_kernel<256><<<gridDim, blockDim, 0, stream_>>>(in, add, wei, out, size, eps);
+}
+
+template <int32_t BLOCK_DIM>
+static __global__ __launch_bounds__(BLOCK_DIM) void rmsnorm_2d_kernel(
     const float* in, 
     const float* __restrict__ wei, 
     float* out, 
@@ -151,16 +218,11 @@ void rmsnorm_2d_kernel_cu(
     const float* wei = weight.ptr<float>();
     float* out = const_cast<float*>(output.ptr<float>());
     int32_t size = static_cast<int32_t>(input.size());
-
-#if defined(QWEN2_SUPPORT) || defined(QWEN3_SUPPORT)
     constexpr float eps = 1e-6f;
-#else
-    constexpr float eps = 1e-5f;
-#endif
     
     dim3 blockDim(128);
     dim3 gridDim(size / dim);
     cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
-    rmsnorm_2d_kernel_fp32<128><<<gridDim, blockDim, 0, stream_>>>(in, wei, out, dim, eps);
+    rmsnorm_2d_kernel<128><<<gridDim, blockDim, 0, stream_>>>(in, wei, out, dim, eps);
 }
 }  // namespace kernel

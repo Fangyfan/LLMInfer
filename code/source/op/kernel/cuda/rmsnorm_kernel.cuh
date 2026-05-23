@@ -11,6 +11,14 @@ void rmsnorm_kernel_cu(
     void* stream
 );
 
+void fused_add_rmsnorm_kernel_cu(
+    const tensor::Tensor& input, 
+    const tensor::Tensor& residual_add, 
+    const tensor::Tensor& weight, 
+    const tensor::Tensor& output, 
+    void* stream
+);
+
 void rmsnorm_2d_kernel_cu(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 

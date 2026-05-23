@@ -2,8 +2,8 @@
 #include "kernel/kernel_interface.h"
 
 namespace op {
-RMSNormLaryer::RMSNormLaryer(base::DeviceType device_type, int32_t dim)
-: LayerParam(device_type, LayerType::LayerRMSNorm, false, "RMSNorm"), dim_(dim) {
+RMSNormLaryer::RMSNormLaryer(base::DeviceType device_type, int32_t dim, bool fuse_add)
+: LayerParam(device_type, LayerType::LayerRMSNorm, false, "RMSNorm"), dim_(dim), fuse_add_(fuse_add) {
     reset_inputs_size(1);
     reset_weights_size(1);
     reset_outputs_size(1);
@@ -35,6 +35,13 @@ base::Status RMSNormLaryer::check() const {
             LOG(ERROR) << "The output tensor error in the rmsnorm layer." << std::endl;
             return status;
         }
+        if (fuse_add_) {
+            status = check_tensor_with_dim(output, device_type_, data_type_, dim_);
+            if (!status) {
+                LOG(ERROR) << "The residual add tensor error in the rmsnorm (fused_add_rmsnorm) layer." << std::endl;
+                return status;
+            }
+        }
     }
     return base::error::success();
 }
@@ -51,7 +58,11 @@ base::Status RMSNormLaryer::forward() {
         CHECK_NE(cuda_config_, nullptr);
     }
     if (input.dims_size() == 1) {
-        kernel::get_rmsnorm_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream : nullptr);
+        if (!fuse_add_) {
+            kernel::get_rmsnorm_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream : nullptr);
+        } else {
+            kernel::get_fused_add_rmsnorm_kernel(device_type_)(input, get_input(1), weight, output, cuda_config_ ? cuda_config_->stream : nullptr);
+        }
     } else {
         kernel::get_rmsnorm_2d_kernel(device_type_)(input, weight, output, dim_, cuda_config_ ? cuda_config_->stream : nullptr);
     }

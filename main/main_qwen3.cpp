@@ -2,6 +2,7 @@
 #include <iostream>
 #include <glog/logging.h>
 #include "model/qwen3.h"
+// #include "model/qwen3_fused.h"
 
 int32_t generate(const model::Qwen3Model& model, const std::string& sentence, int total_steps, double& TTFT, double& TPOT, bool need_output = false) {
     // 在此处记录首字延迟 TTFT 的起始时间

@@ -10,13 +10,15 @@ namespace op {
 // 其中 RMS(in) = 1 / sqrt(mean(in^2) + eps) = 1 / sqrt(sum(in^2) / dim + eps)
 class RMSNormLaryer : public LayerParam {
 public:
-    explicit RMSNormLaryer(base::DeviceType device_type, int32_t dim);
+    explicit RMSNormLaryer(base::DeviceType device_type, int32_t dim, bool fuse_add = false);
 
     base::Status check() const override;
 
     base::Status forward() override;
+
 private:
     int32_t dim_ = 0;
+    bool fuse_add_ = false;
 };
 }  // namespace op
 

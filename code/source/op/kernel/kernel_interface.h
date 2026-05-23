@@ -23,6 +23,15 @@ using RMSNormKernel = void (*)(
 );
 RMSNormKernel get_rmsnorm_kernel(base::DeviceType device_type);
 
+using FusedAddRMSNormKernel = void (*)(
+    const tensor::Tensor& input, 
+    const tensor::Tensor& residual_add,  
+    const tensor::Tensor& weight, 
+    const tensor::Tensor& output, 
+    void* stream
+);
+FusedAddRMSNormKernel get_fused_add_rmsnorm_kernel(base::DeviceType device_type);
+
 using RMSNorm2DKernel = void (*)(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 
@@ -32,16 +41,24 @@ using RMSNorm2DKernel = void (*)(
 );
 RMSNorm2DKernel get_rmsnorm_2d_kernel(base::DeviceType device_type);
 
-using MatmulKernel = void (*)(
+using GEMVKernel = void (*)(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 
     const tensor::Tensor& output, 
     float scale, 
     void* stream
 );
-MatmulKernel get_matmul_kernel(base::DeviceType device_type);
+GEMVKernel get_gemv_kernel(base::DeviceType device_type);
 
-using MatmulKernelQuant = void (*)(
+using FusedGEMVAddKernel = void (*)(
+    const tensor::Tensor& input, 
+    const tensor::Tensor& weight, 
+    const tensor::Tensor& output, 
+    void* stream
+);
+FusedGEMVAddKernel get_fused_gemv_add_kernel(base::DeviceType device_type);
+
+using GEMVInt8Kernel = void (*)(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 
     const tensor::Tensor& output, 
@@ -49,7 +66,7 @@ using MatmulKernelQuant = void (*)(
     int32_t group_size, 
     void* stream
 );
-MatmulKernelQuant get_matmul_kernel_quant8(base::DeviceType device_type);
+GEMVInt8Kernel get_gemv_int8_kernel(base::DeviceType device_type);
 
 using SwigluKernel = void (*)(
     const tensor::Tensor& input1, 

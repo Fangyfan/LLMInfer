@@ -28,8 +28,8 @@ TEST(test_op_matmul, matmul_fp32_cuda_stream) {
     auto cuda_config = std::make_unique<kernel::CudaConfig>();
     cuda_config->create();
 
-    kernel::get_matmul_kernel(base::DeviceType::DeviceCPU)(input_cpu, weight_cpu, output_cpu, 1.0f, nullptr);
-    kernel::get_matmul_kernel(base::DeviceType::DeviceCUDA)(input_cu, weight_cu, output_cu, 1.0f, cuda_config->stream);
+    kernel::get_gemv_kernel(base::DeviceType::DeviceCPU)(input_cpu, weight_cpu, output_cpu, 1.0f, nullptr);
+    kernel::get_gemv_kernel(base::DeviceType::DeviceCUDA)(input_cu, weight_cu, output_cu, 1.0f, cuda_config->stream);
 
     output_cu.to_cpu();
     for (int32_t i = 0; i < output_cu.size(); ++i) {
@@ -61,8 +61,8 @@ TEST(test_op_matmul, matmul_scale_fp32_cuda_stream) {
     auto cuda_config = std::make_unique<kernel::CudaConfig>();
     cuda_config->create();
 
-    kernel::get_matmul_kernel(base::DeviceType::DeviceCPU)(input_cpu, weight_cpu, output_cpu, 0.8f, nullptr);
-    kernel::get_matmul_kernel(base::DeviceType::DeviceCUDA)(input_cu, weight_cu, output_cu, 0.8f, cuda_config->stream);
+    kernel::get_gemv_kernel(base::DeviceType::DeviceCPU)(input_cpu, weight_cpu, output_cpu, 0.8f, nullptr);
+    kernel::get_gemv_kernel(base::DeviceType::DeviceCUDA)(input_cu, weight_cu, output_cu, 0.8f, cuda_config->stream);
 
     output_cu.to_cpu();
     for (int32_t i = 0; i < output_cu.size(); ++i) {
@@ -85,7 +85,7 @@ TEST(test_op_matmul, matmul_fp32_cpu) {
         weight_cpu.index<float>(i) = float(i + 1);
     }
     
-    kernel::get_matmul_kernel(base::DeviceType::DeviceCPU)(input_cpu, weight_cpu, output_cpu, 1.0f, nullptr);
+    kernel::get_gemv_kernel(base::DeviceType::DeviceCPU)(input_cpu, weight_cpu, output_cpu, 1.0f, nullptr);
 
     // [ 1  2  3  4 ]   [ 1 ]   [ 0 ]
     // [ 5  6  7  8 ] × [-1 ] = [ 0 ]
@@ -116,7 +116,7 @@ TEST(test_op_matmul, matmul_fp32_cuda_no_stream) {
     weight_cu.to_cuda();
     
     tensor::Tensor output_cu(base::DataType::DataTypeFp32, 3, true, allocator_cu);
-    kernel::get_matmul_kernel(base::DeviceType::DeviceCUDA)(input_cu, weight_cu, output_cu, 1.0f, nullptr);
+    kernel::get_gemv_kernel(base::DeviceType::DeviceCUDA)(input_cu, weight_cu, output_cu, 1.0f, nullptr);
     
     // [ 1  2  3  4 ]   [ 1 ]   [ 0 ]
     // [ 5  6  7  8 ] × [-1 ] = [ 0 ]
