@@ -1,7 +1,7 @@
 #include "add_kernel.cuh"
 
 namespace kernel {
-static __global__ void add_kernel_fp32(
+static __global__ void add_kernel(
     const float* in1, 
     const float* __restrict__ in2, 
     float* out, 
@@ -38,6 +38,6 @@ void add_kernel_cu(
     dim3 gridDim((size + blockDim.x - 1) / blockDim.x);
     cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
     
-    add_kernel_fp32<<<gridDim, blockDim, 0, stream_>>>(in1, in2, out, size);
+    add_kernel<<<gridDim, blockDim, 0, stream_>>>(in1, in2, out, size);
 }
 }  // namespace kernel

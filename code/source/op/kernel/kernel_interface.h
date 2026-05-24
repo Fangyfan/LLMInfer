@@ -58,6 +58,16 @@ using FusedGEMVAddKernel = void (*)(
 );
 FusedGEMVAddKernel get_fused_gemv_add_kernel(base::DeviceType device_type);
 
+using FusedQKVGEMVKernel = void (*)(
+    const tensor::Tensor& input, 
+    const tensor::Tensor& weight, 
+    const tensor::Tensor& query, 
+    const tensor::Tensor& key, 
+    const tensor::Tensor& value, 
+    void* stream
+);
+FusedQKVGEMVKernel get_fused_qkv_gemv_kernel(base::DeviceType device_type);
+
 using GEMVInt8Kernel = void (*)(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 
@@ -75,6 +85,15 @@ using SwigluKernel = void (*)(
     void* stream
 );
 SwigluKernel get_swiglu_kernel(base::DeviceType device_type);
+
+using FusedGateUpSwiGLUKernel = void (*)(
+    const tensor::Tensor& input, 
+    const tensor::Tensor& weight, 
+    const tensor::Tensor& output, 
+    int32_t immediate_dim, 
+    void* stream
+);
+FusedGateUpSwiGLUKernel get_fused_gate_up_gemv_swiglu_kernel(base::DeviceType device_type);
 
 using EmbeddingKernel = void (*)(
     const tensor::Tensor& input, 
@@ -105,6 +124,20 @@ using RoPEKernel = void (*)(
     void* stream
 );
 RoPEKernel get_rope_kernel(base::DeviceType device_type);
+
+using FusedQKNormRoPEKernel = void (*)(
+    const tensor::Tensor& query, 
+    const tensor::Tensor& key, 
+    const tensor::Tensor& weight, 
+    const tensor::Tensor& token_pos, 
+    const tensor::Tensor& sin_cache, 
+    const tensor::Tensor& cos_cache, 
+    int32_t dim, 
+    int32_t kv_dim, 
+    int32_t head_dim, 
+    void* stream
+);
+FusedQKNormRoPEKernel get_fused_qk_norm_rope_kernel(base::DeviceType device_type);
 
 using MHAKernel = void (*)(
     const tensor::Tensor& query, 

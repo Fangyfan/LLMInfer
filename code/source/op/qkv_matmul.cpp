@@ -20,17 +20,17 @@ base::Status QKVMatmulLayer::check() const {
         LOG(ERROR) << "The output query tensor error in the qkv-matmul layer." << std::endl;
         return status;
     }
-    status = check_tensor_with_dim(get_output(1), device_type_, data_type_, dim_);
+    status = check_tensor_with_dim(get_input(1), device_type_, data_type_, dim_);
     if (!status) {
         LOG(ERROR) << "The query tensor error in the qkv-matmul layer." << std::endl;
         return status;
     }
-    status = check_tensor_with_dim(get_output(2), device_type_, data_type_, kv_dim_);
+    status = check_tensor_with_dim(get_input(2), device_type_, data_type_, kv_dim_);
     if (!status) {
         LOG(ERROR) << "The key tensor error in the qkv-matmul layer." << std::endl;
         return status;
     }
-    status = check_tensor_with_dim(get_output(3), device_type_, data_type_, kv_dim_);
+    status = check_tensor_with_dim(get_input(3), device_type_, data_type_, kv_dim_);
     if (!status) {
         LOG(ERROR) << "The value tensor error in the qkv-matmul layer." << std::endl;
         return status;
@@ -51,7 +51,7 @@ base::Status QKVMatmulLayer::forward() {
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         CHECK_NE(cuda_config_, nullptr);
     }
-    // kernel::get_fused_qkv_gemv_kernel(device_type_)(input, weight, query, key, value, cuda_config_ ? cuda_config_->stream : nullptr);
+    kernel::get_fused_qkv_gemv_kernel(device_type_)(input, weight, query, key, value, cuda_config_ ? cuda_config_->stream : nullptr);
     return base::error::success();
 }
 

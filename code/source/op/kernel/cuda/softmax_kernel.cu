@@ -54,7 +54,7 @@ static __device__ __forceinline__ MD block_reduce(MD val) {
 }
 
 template <int32_t BLOCK_DIM>
-static __global__ __launch_bounds__(BLOCK_DIM) void softmax_kernel_fp32(float* __restrict__ input, int32_t size) {
+static __global__ __launch_bounds__(BLOCK_DIM) void softmax_kernel(float* __restrict__ input, int32_t size) {
     input += blockIdx.x * size;
     int32_t size4 = size >> 2;
     constexpr int32_t WARP_NUM = BLOCK_DIM >> 5;
@@ -101,6 +101,6 @@ void softmax_kernel_cu(const tensor::Tensor& input, void* stream) {
     dim3 gridDim(1);
     dim3 blockDim(256);
     cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
-    softmax_kernel_fp32<256><<<gridDim, blockDim, 0, stream_>>>(in, size);
+    softmax_kernel<256><<<gridDim, blockDim, 0, stream_>>>(in, size);
 }
 }  // namespace kernel

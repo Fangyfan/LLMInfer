@@ -39,11 +39,12 @@ base::Status GateUpSwigluLayer::forward() {
     }
     const tensor::Tensor& input = get_input(0);
     const tensor::Tensor& weight = get_weight(0);
-    const tensor::Tensor& output = get_weight(0);
+    const tensor::Tensor& output = get_output(0);
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         CHECK_NE(cuda_config_, nullptr);
     }
-    // kernel::get_fused_gate_up_gemv_swiglu_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream : nullptr);
+    kernel::get_fused_gate_up_gemv_swiglu_kernel(device_type_)(input, weight, output, immediate_dim_, 
+                                                               cuda_config_ ? cuda_config_->stream : nullptr);
     return base::error::success();
 }
 

@@ -7,7 +7,7 @@
 
 #include <glog/logging.h>
 #include "model/qwen3.h"
-// #include "model/qwen3_fused.h"
+#include "model/qwen3_fused.h"
 
 #define CUDA_CHECK(expr)                                                                    \
     do {                                                                                    \
@@ -19,7 +19,8 @@ static inline void sync_cuda() {
     CUDA_CHECK(cudaDeviceSynchronize());
 }
 
-int32_t generate(const model::Qwen3Model& model, const std::string& sentence, int total_steps, double& TTFT, double& TPOT, bool need_output = false) {
+template <typename Model>
+int32_t generate(const Model& model, const std::string& sentence, int total_steps, double& TTFT, double& TPOT, bool need_output = false) {
     using Clock = std::chrono::steady_clock;
 
     TTFT = 0.0;
@@ -139,7 +140,10 @@ int main(int argc, char* argv[]) {
 
     bool is_quant_model = false;
 
-    model::Qwen3Model model(base::TokenizerType::EncodeBpe, tokenizer_path, checkpoint_path, is_quant_model);
+    // using ModelType = model::Qwen3Model;
+    using ModelType = model::Qwen3FusedModel;
+
+    ModelType model(base::TokenizerType::EncodeBpe, tokenizer_path, checkpoint_path, is_quant_model);
 
     base::Status status = model.init(base::DeviceType::DeviceCUDA);
     if (!status) {
@@ -157,7 +161,7 @@ int main(int argc, char* argv[]) {
 
         // warmup：避免首次 CUDA 初始化、kernel 加载、显存分配污染正式结果。
         // 如果你的 model 有 reset_kv_cache / clear_kv_cache 接口，建议 warmup 后调用。
-        generate(model, sentence, 128, warmup_TTFT, warmup_TPOT, false);
+        generate<ModelType>(model, sentence, 128, warmup_TTFT, warmup_TPOT, false);
     }
 
     std::cout << "Qwen3" << (is_quant_model ? "-quant8" : "") << " model generating..." << std::endl;
@@ -169,7 +173,7 @@ int main(int argc, char* argv[]) {
     sync_cuda();
     auto start = std::chrono::steady_clock::now();
 
-    int32_t decode_tokens = generate(model, sentence, total_steps, TTFT, TPOT, true);
+    int32_t decode_tokens = generate<ModelType>(model, sentence, total_steps, TTFT, TPOT, true);
 
     sync_cuda();
     auto end = std::chrono::steady_clock::now();

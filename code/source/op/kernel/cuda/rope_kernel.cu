@@ -2,7 +2,7 @@
 
 namespace kernel {
 
-static __global__ void sin_cos_cache_kernel_fp32(
+static __global__ void sin_cos_cache_kernel(
     float* __restrict__ sin_cache, 
     float* __restrict__ cos_cache, 
     int32_t head_dim, 
@@ -37,10 +37,10 @@ void sin_cos_cache_precompute_cu(
     dim3 blockDim(256);
     dim3 gridDim(head_dim / 2);
     cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
-    sin_cos_cache_kernel_fp32<<<gridDim, blockDim, 0, stream_>>>(sin_cache_ptr, cos_cache_ptr, head_dim, max_seq_len);
+    sin_cos_cache_kernel<<<gridDim, blockDim, 0, stream_>>>(sin_cache_ptr, cos_cache_ptr, head_dim, max_seq_len);
 }
 
-static __global__ void rope_kernel_fp32(
+static __global__ void rope_kernel(
     float* __restrict__ q, 
     float* __restrict__ k, 
     const float* __restrict__ sptr, 
@@ -110,7 +110,7 @@ void rope_kernel_cu(
     dim3 blockDim(256);
     dim3 gridDim((dim / 2 + blockDim.x - 1) / blockDim.x); // 总共需要旋转 dim/2 个 pair
     cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
-    rope_kernel_fp32<<<gridDim, blockDim, 0, stream_>>>(q, k, sptr, cptr, dim, kv_dim, head_dim);
+    rope_kernel<<<gridDim, blockDim, 0, stream_>>>(q, k, sptr, cptr, dim, kv_dim, head_dim);
 }
 
 }  // namespace kernel

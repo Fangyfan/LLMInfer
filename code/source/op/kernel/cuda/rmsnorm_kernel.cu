@@ -170,6 +170,83 @@ void fused_add_rmsnorm_kernel_cu(
 }
 
 template <int32_t BLOCK_DIM>
+static __global__ __launch_bounds__(BLOCK_DIM) void fused_qk_norm_rope_kernel(
+    float* __restrict__ query, 
+    float* __restrict__ key, 
+    const float* __restrict__ weight, 
+    const float* __restrict__ sin_cache, 
+    const float* __restrict__ cos_cache, 
+    int32_t head_num, 
+    int32_t head_dim, 
+    float eps
+) {
+    constexpr int32_t WARP_NUM = (BLOCK_DIM >> 5);
+    float* in = (blockIdx.x < head_num) ? (query + blockIdx.x * head_dim) : (key + (blockIdx.x - head_num) * head_dim);
+    const float* wei = (blockIdx.x < head_num) ? weight : (weight + head_dim);
+    float* out = in;
+
+    float val = in[threadIdx.x];
+    float sum = val * val;
+    sum = block_reduce_sum<WARP_NUM>(sum);
+
+    __shared__ float shared_scale;
+    if (threadIdx.x == 0) {
+        shared_scale = rsqrtf(sum / head_dim + eps);
+    }
+    __syncthreads();
+
+    if (threadIdx.x < 64) {
+        int32_t pair_id = threadIdx.x;
+        float sin_theta = sin_cache[pair_id];
+        float cos_theta = cos_cache[pair_id];
+        
+        float scale = shared_scale;
+        float a = in[pair_id] * wei[pair_id] * scale;
+        float b = in[pair_id + 64] * wei[pair_id + 64] * scale;
+        
+        out[pair_id] = a * cos_theta - b * sin_theta;
+        out[pair_id + 64] = a * sin_theta + b * cos_theta;
+    }
+}
+
+void fused_qk_norm_rope_kernel_cu(
+    const tensor::Tensor& query, 
+    const tensor::Tensor& key, 
+    const tensor::Tensor& weight, 
+    const tensor::Tensor& token_pos, 
+    const tensor::Tensor& sin_cache, 
+    const tensor::Tensor& cos_cache, 
+    int32_t dim, 
+    int32_t kv_dim, 
+    int32_t head_dim, 
+    void* stream
+) {
+    CHECK(query.device_type() == base::DeviceType::DeviceCUDA);
+    CHECK(key.device_type() == base::DeviceType::DeviceCUDA);
+    CHECK(weight.device_type() == base::DeviceType::DeviceCUDA);
+    CHECK(token_pos.device_type() == base::DeviceType::DeviceCPU);
+    CHECK(sin_cache.device_type() == base::DeviceType::DeviceCUDA);
+    CHECK(cos_cache.device_type() == base::DeviceType::DeviceCUDA);
+    
+    CHECK(head_dim == 128);
+    const int32_t head_num = dim / head_dim;
+    const int32_t kv_head_num = kv_dim / head_dim;
+
+    float* q = const_cast<float*>(query.ptr<float>());
+    float* k = const_cast<float*>(key.ptr<float>());
+    const float* wei = weight.ptr<float>();
+    const int32_t pos = token_pos.index<int32_t>(0);
+    const float* sptr = sin_cache.ptr<float>(pos * head_dim / 2); // sptr 索引到第 pos 行
+    const float* cptr = cos_cache.ptr<float>(pos * head_dim / 2); // cptr 索引到第 pos 行
+    constexpr float eps = 1e-6f;
+    
+    dim3 blockDim(head_dim);
+    dim3 gridDim(head_num + kv_head_num);
+    cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
+    fused_qk_norm_rope_kernel<128><<<gridDim, blockDim, 0, stream_>>>(q, k, wei, sptr, cptr, head_num, head_dim, eps);
+}
+
+template <int32_t BLOCK_DIM>
 static __global__ __launch_bounds__(BLOCK_DIM) void rmsnorm_2d_kernel(
     const float* in, 
     const float* __restrict__ wei, 
@@ -180,21 +257,18 @@ static __global__ __launch_bounds__(BLOCK_DIM) void rmsnorm_2d_kernel(
     constexpr int32_t WARP_NUM = (BLOCK_DIM >> 5);
     in += blockIdx.x * dim;
     out += blockIdx.x * dim;
-    
     float sum = 0.0f;
     for (int32_t i = threadIdx.x; i < dim; i += blockDim.x) {
         float val = in[i];
         sum += val * val;
     }
     sum = block_reduce_sum<WARP_NUM>(sum);
-
     __shared__ float shared_scale;
     if (threadIdx.x == 0) {
         shared_scale = rsqrtf(sum / dim + eps);
     }
     __syncthreads();
     float scale = shared_scale;
-
     for (int32_t i = threadIdx.x; i < dim; i += blockDim.x) {
         out[i] = in[i] * wei[i] * scale;
     }

@@ -76,7 +76,16 @@ FusedGEMVAddKernel get_fused_gemv_add_kernel(base::DeviceType device_type) {
     if (device_type == base::DeviceType::DeviceCUDA) {
         return fused_gemv_add_kernel_cu;
     } else {
-        LOG(FATAL) << "Unknown device type for get a matmul kernel." << std::endl;
+        LOG(FATAL) << "Unknown device type for get a fused_gemv_add kernel." << std::endl;
+        return nullptr;
+    }
+}
+
+FusedQKVGEMVKernel get_fused_qkv_gemv_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
+        return fused_qkv_gemv_kernel_cu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a fused_qkv_gemv kernel." << std::endl;
         return nullptr;
     }
 }
@@ -85,7 +94,7 @@ GEMVInt8Kernel get_gemv_int8_kernel(base::DeviceType device_type) {
     if (device_type == base::DeviceType::DeviceCUDA) {
         return gemv_int8_kernel_cu;
     } else {
-        LOG(FATAL) << "Unknown device type for get a quant8 matmul kernel." << std::endl;
+        LOG(FATAL) << "Unknown device type for get a gemv_int8 kernel." << std::endl;
         return nullptr;
     }
 }
@@ -97,6 +106,15 @@ SwigluKernel get_swiglu_kernel(base::DeviceType device_type) {
         return swiglu_kernel_cpu;
     } else {
         LOG(FATAL) << "Unknown device type for get a swiglu kernel." << std::endl;
+        return nullptr;
+    }
+}
+
+FusedGateUpSwiGLUKernel get_fused_gate_up_gemv_swiglu_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
+        return fused_gate_up_gemv_swiglu_kernel_cu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a fused_gate_up_gemv_swiglu kernel." << std::endl;
         return nullptr;
     }
 }
@@ -130,6 +148,15 @@ RoPEKernel get_rope_kernel(base::DeviceType device_type) {
         return rope_kernel_cpu;
     } else {
         LOG(FATAL) << "Unknown device type for get a rope kernel." << std::endl;
+        return nullptr;
+    }
+}
+
+FusedQKNormRoPEKernel get_fused_qk_norm_rope_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
+        return fused_qk_norm_rope_kernel_cu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a fused_qk_norm_rope kernel." << std::endl;
         return nullptr;
     }
 }

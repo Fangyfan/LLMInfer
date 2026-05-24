@@ -13,7 +13,7 @@ static __device__ __forceinline__ float warp_reduce_sum(float val) {
 }
 
 template <int32_t BLOCK_DIM, int32_t Bc>
-static __global__ __launch_bounds__(BLOCK_DIM) void flashattention_gqa_kernel_fp32(
+static __global__ __launch_bounds__(BLOCK_DIM) void flashattention_gqa_kernel(
     const float* __restrict__ query,
     const float* __restrict__ key_cache,
     const float* __restrict__ value_cache,
@@ -150,7 +150,7 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashattention_gqa_kernel_fp
 }
 
 template <int32_t BLOCK_DIM, int32_t Bc>
-static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_split_kernel_fp32(
+static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_split_kernel(
     const float* __restrict__ query,
     const float* __restrict__ key_cache,
     const float* __restrict__ value_cache,
@@ -307,7 +307,7 @@ static __device__ __forceinline__ float warp_reduce_max(float val) {
 }
 
 template <int32_t BLOCK_DIM>
-static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_combine_kernel_fp32(
+static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_combine_kernel(
     const float* __restrict__ kv_split_output,
     float* __restrict__ output,
     int32_t head_dim,
@@ -401,7 +401,7 @@ void mha_kernel_cu(
     constexpr int32_t Bc = 32;
     const int32_t shared_size = 2 * (head_dim + Bc * head_dim + Bc) * sizeof(float);
     if (seq_len <= 128) {
-        flashattention_gqa_kernel_fp32<thread_num, Bc><<<head_num, thread_num, shared_size, stream_>>>(
+        flashattention_gqa_kernel<thread_num, Bc><<<head_num, thread_num, shared_size, stream_>>>(
             query_ptr, key_cache_ptr, value_cache_ptr, output_ptr, layer_offset, seq_len, kv_dim, kv_mul, head_dim, scale
         );
         return;
@@ -413,13 +413,13 @@ void mha_kernel_cu(
     const int32_t kv_split_num = (seq_len + kv_split_size - 1) / kv_split_size;
 
     dim3 gridDim(kv_split_num, head_num);
-    flashdecoding_gqa_split_kernel_fp32<thread_num, Bc><<<gridDim, thread_num, shared_size, stream_>>>(
+    flashdecoding_gqa_split_kernel<thread_num, Bc><<<gridDim, thread_num, shared_size, stream_>>>(
         query_ptr, key_cache_ptr, value_cache_ptr, kv_split_output_ptr, layer_offset, seq_len, kv_dim, kv_mul, head_dim,
         kv_split_size, kv_split_num, scale
     );
 
     const int32_t combine_shared_size = 2 * kv_split_num * sizeof(float);
-    flashdecoding_gqa_combine_kernel_fp32<thread_num><<<head_num, thread_num, combine_shared_size, stream_>>>(
+    flashdecoding_gqa_combine_kernel<thread_num><<<head_num, thread_num, combine_shared_size, stream_>>>(
         kv_split_output_ptr, output_ptr, head_dim, kv_split_size, kv_split_num
     );
 }
