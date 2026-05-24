@@ -16,9 +16,9 @@ public:
     base::Status forward() override;
 
 private:
-    int32_t dim0_ = 0;                  // 权重矩阵 w 的第 1 个维度
-    int32_t dim1_ = 0;                  // 权重矩阵 w 的第 2 个维度
-    bool fuse_add_ = false;             // 是否与 add 融合，即 GEMV + Add (dim0)
+    int32_t dim0_ = 0;      // 权重矩阵 w 的第 1 个维度
+    int32_t dim1_ = 0;      // 权重矩阵 w 的第 2 个维度
+    bool fuse_add_ = false; // 是否与 add 融合，即 GEMV + Add (dim0)
 };
 }  // namespace op
 

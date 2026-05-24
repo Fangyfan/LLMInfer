@@ -29,27 +29,31 @@ enum class ModelBufferType : uint8_t {
     Logits = 16,            // 词表原始分数分布 Logits
     ArgmaxToken = 17,       // 贪心采样 token id
     ArgmaxBuffer = 18,      // 贪心采样中间结果缓存 buffer
+    SwiGLUOutput = 19,      // Gate/Up Proj + SwiGLU 融合算子输出向量
+    ResidualAdd = 20,       // Attention / FFN 每次 Pre RMSNorm 之前的输入向量
 };
 }  // namespace model
 
 namespace base {
 enum class DeviceType : uint8_t {
     DeviceUnknown = 0,
-    DeviceCPU = 1,
-    DeviceCUDA = 2,
+    DeviceCUDA = 1,
+    DeviceCPU = 2,
 };
 
 enum class DataType : uint8_t {
     DataTypeUnknown = 0,
-    DataTypeFp32 = 1,    // 单精度浮点
-    DataTypeInt32 = 2,   // 32 位整数
-    DataTypeInt8 = 3,    // 8 位整数（量化）
+    DataTypeFp32 = 1,   // 单精度浮点 FP32
+    DataTypeBf16 = 2,   // 半精度浮点 BF16
+    DataTypeInt32 = 3,  // 32 位整数
+    DataTypeInt8 = 4,   // 8 位整数（量化）
 };
 
 enum class ModelType : uint8_t {
     ModelTypeUnknown = 0,
-    ModelTypeLlama2 = 1,
-    ModelTypeQwen3 = 2,
+    ModelTypeQwen3 = 1,
+    ModelTypeLlama2 = 2,
+    ModelTypeLlama3 = 3,
 };
 
 inline size_t data_type_size(DataType data_type) {

@@ -6,16 +6,16 @@
 namespace model {
 struct Qwen3FusedLayers {
     std::unique_ptr<op::Layer> embedding_layer_;
+    
     std::vector<std::unique_ptr<op::Layer>> pre_rmsnorm_layers_;
-
     std::vector<std::unique_ptr<op::Layer>> fused_qkv_proj_layers_;
     std::vector<std::unique_ptr<op::Layer>> fused_qk_norm_rope_layers_;
     std::unique_ptr<op::Layer> flashdecoding_gqa_layer_;
-    std::vector<std::unique_ptr<op::Layer>> o_proj_layers_;
+    std::vector<std::unique_ptr<op::Layer>> fused_o_proj_add_layers_;
     
-    std::vector<std::unique_ptr<op::Layer>> fused_add_rmsnorm_layers_;
+    std::vector<std::unique_ptr<op::Layer>> ffn_rmsnorm_layers_;
     std::vector<std::unique_ptr<op::Layer>> fused_gate_up_swiglu_layers_;
-    std::vector<std::unique_ptr<op::Layer>> fused_down_add_layers_;
+    std::vector<std::unique_ptr<op::Layer>> fused_down_proj_add_layers_;
     
     std::unique_ptr<op::Layer> final_rmsnorm_layer_;
     std::unique_ptr<op::Layer> lm_head_layer_;
@@ -23,9 +23,9 @@ struct Qwen3FusedLayers {
     void to_cuda(std::shared_ptr<kernel::CudaConfig> cuda_config);
 };
 
-class Qwen3Model : public Model {
+class Qwen3FusedModel : public Model {
 public:
-    explicit Qwen3Model(base::TokenizerType tokenizer_type, std::string tokenizer_path, std::string model_path, bool is_quant_model);
+    explicit Qwen3FusedModel(base::TokenizerType tokenizer_type, std::string tokenizer_path, std::string model_path, bool is_quant_model);
 
     // Qwen3 模型初始化
     base::Status init(base::DeviceType device_type) override;
@@ -55,19 +55,16 @@ private:
     // 创建量化 Int8 可学习参数层: 把需要训练参数的算子实例化
     void create_param_quant_layers() override;
 
-    // 对输入数据做 RMSNorm: Qwen3 采用 Pre-Norm 结构。这意味着数据在进入注意力模块之前，必须先被归一化，这有助于数值稳定
-    void attention_rmsnorm(int32_t layer_id, const tensor::Tensor& input) const;
-
-    // 投影 QKV、缓存 KV、RoPE 旋转位置编码
-    void attention_qkv_rope(int32_t layer_id, const tensor::Tensor& token_pos) const;
+    // 对输入数据做 RMSNorm、投影 QKV、缓存 KV、RoPE 旋转位置编码
+    void rmsnorm_qkv_rope(int32_t layer_id, const tensor::Tensor& input, const tensor::Tensor& token_pos) const;
 
     // 执行多头注意力机制: 读取 KV Cache（上一轮对话的历史），计算注意力分数，并融合 V 向量，最后乘上 wo 输出矩阵
-    void attention_mha(int32_t layer_id, const tensor::Tensor& token_pos) const;
+    void flash_decoding_gqa(int32_t layer_id, const tensor::Tensor& residual_add, const tensor::Tensor& token_pos) const;
 
     // 执行一次 Add，即残差连接 x = x + attention_output
     // 再次进行 RMSNorm，执行 SwiGLU 也就是 MLP 块: output = (SiLU(x * w1) @ (x * w3)) w2 ，这里对应代码中的 w1, w3, w2 层
     // 最后再执行一次 Add，即残差连接
-    void feed_forward(int32_t layer_id, const tensor::Tensor& input) const;
+    void feed_forward(int32_t layer_id, const tensor::Tensor& residual_add) const;
 
     // 分类头 (Classification): 最后一层 Transformer 跑完后，将向量映射到词表大小，输出叫 Logits（未归一化的概率分值）
     void cls_logits(const tensor::Tensor& input) const;
@@ -77,7 +74,7 @@ private:
 
 private:
     std::shared_ptr<kernel::CudaConfig> cuda_config_;
-    std::unique_ptr<Qwen3FusedLayers> qwen3_layers_;
+    std::unique_ptr<Qwen3FusedLayers> qwen3_fused_layers_;
 };
 }  // namespace model
 

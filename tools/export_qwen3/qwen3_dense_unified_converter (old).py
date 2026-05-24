@@ -3,44 +3,14 @@
 """
 Unified Qwen3 dense HF -> fp32 .bin exporter.
 
-This exporter is aligned with the following C++ loading layout:
+Supports:
+- Qwen3-0.6B
+- Qwen3-1.7B
+- Qwen3-4B
+- Other dense Qwen3 variants following the same HF naming convention
 
-1. Embedding:
-   model.embed_tokens.weight
-
-2. Pre RMSNorm:
-   model.layers.{i}.input_layernorm.weight
-
-3. Attention QKV per layer:
-   model.layers.{i}.self_attn.q_proj.weight
-   model.layers.{i}.self_attn.k_proj.weight
-   model.layers.{i}.self_attn.v_proj.weight
-
-4. Q/K RMSNorm per layer:
-   model.layers.{i}.self_attn.q_norm.weight
-   model.layers.{i}.self_attn.k_norm.weight
-
-5. Attention O projection:
-   model.layers.{i}.self_attn.o_proj.weight
-
-6. FFN RMSNorm:
-   model.layers.{i}.post_attention_layernorm.weight
-
-7. FFN Gate/Up per layer:
-   model.layers.{i}.mlp.gate_proj.weight
-   model.layers.{i}.mlp.up_proj.weight
-
-8. FFN Down:
-   model.layers.{i}.mlp.down_proj.weight
-
-9. Final RMSNorm:
-   model.norm.weight
-
-10. LM Head:
-   Not written.
-   The C++ loader ties lm_head to embedding by using weight_ptr(0).
-
-Binary format:
+The generated binary format is intentionally kept IDENTICAL to the original
+reference exporter:
 
 header = int32[8]
 [
@@ -54,30 +24,41 @@ header = int32[8]
     intermediate_size,
 ]
 
-followed by fp32 weights.
-
-Supports:
-- Qwen3-0.6B
-- Qwen3-1.7B
-- Qwen3-4B
-- Other dense Qwen3 variants following the same HF naming convention
+followed by fp32 weights written in the exact same tensor order.
 
 Supports:
 - single model.safetensors
 - sharded model-00001-of-0000X.safetensors
 - automatic shard lookup via model.safetensors.index.json
-- shard files without index, such as model-00001-of-00001.safetensors
 
 Examples
 --------
 
 Qwen3-0.6B:
+python qwen3_dense_unified_converter.py \
+  --model_dir /home/yifanfang/LLMInfer/models/qwen3/Qwen3-0.6B \
+  --out_file /home/yifanfang/LLMInfer/models/qwen3/qwen3_0.6b_fp32.bin
+
+or:
+
 python qwen3_dense_unified_converter.py --preset 0.6b
 
 Qwen3-1.7B:
+python qwen3_dense_unified_converter.py \
+  --model_dir /home/yifanfang/LLMInfer/models/qwen3/Qwen3-1.7B \
+  --out_file /home/yifanfang/LLMInfer/models/qwen3/qwen3_1.7b_fp32.bin
+
+or:
+
 python qwen3_dense_unified_converter.py --preset 1.7b
 
 Qwen3-4B:
+python qwen3_dense_unified_converter.py \
+  --model_dir /home/yifanfang/LLMInfer/models/qwen3/Qwen3-4B \
+  --out_file /home/yifanfang/LLMInfer/models/qwen3/qwen3_4b_fp32.bin
+
+or:
+
 python qwen3_dense_unified_converter.py --preset 4b
 
 Install dependencies:
@@ -87,6 +68,7 @@ pip install torch safetensors tqdm
 import argparse
 import gc
 import json
+import os
 import struct
 from pathlib import Path
 from typing import Dict, Optional
@@ -129,12 +111,7 @@ PRESETS = {
 
 
 def serialize_fp32(file_obj, tensor: torch.Tensor) -> None:
-    """
-    Write tensor as contiguous little-endian fp32.
-
-    This version avoids Python-level struct packing of every element,
-    which is much faster and uses less temporary memory.
-    """
+    """Write tensor as contiguous little-endian fp32."""
 
     arr = (
         tensor.detach()
@@ -145,7 +122,7 @@ def serialize_fp32(file_obj, tensor: torch.Tensor) -> None:
         .numpy()
     )
 
-    file_obj.write(arr.tobytes())
+    file_obj.write(struct.pack(f"{arr.size}f", *arr))
 
 
 # ============================================================
@@ -162,7 +139,18 @@ class ShardedTensorLoader:
     - multi-shard checkpoints
     - one-file shard checkpoints such as model-00001-of-00001.safetensors
 
-    We do not load all shards into RAM simultaneously.
+    We DO NOT load all shards into RAM simultaneously.
+
+    Instead:
+    - read model.safetensors.index.json when available
+    - find which shard contains a tensor
+    - load only that shard
+    - automatically switch shards when needed
+
+    If model.safetensors.index.json is not available, this loader also supports:
+    - model.safetensors
+    - model-00001-of-00001.safetensors
+    - other model-*.safetensors files by scanning them once for tensor names
     """
 
     def __init__(self, model_dir: str):
@@ -192,8 +180,8 @@ class ShardedTensorLoader:
             shard_names = sorted(set(self.weight_map.values()))
 
             print("Detected indexed sharded checkpoint:")
-            for shard_name in shard_names:
-                print("   ", shard_name)
+            for s in shard_names:
+                print("   ", s)
 
         # ----------------------------------------------------
         # single model.safetensors checkpoint
@@ -215,6 +203,10 @@ class ShardedTensorLoader:
 
         # ----------------------------------------------------
         # fallback: scan model-*.safetensors
+        #
+        # This is useful for checkpoints that have:
+        #   model-00001-of-00001.safetensors
+        # but no model.safetensors.index.json.
         # ----------------------------------------------------
 
         else:
@@ -238,7 +230,7 @@ class ShardedTensorLoader:
                 for tensor_name in tensors.keys():
                     if tensor_name in self.weight_map:
                         raise RuntimeError(
-                            "Duplicate tensor name found while scanning shards: "
+                            f"Duplicate tensor name found while scanning shards: "
                             f"{tensor_name}"
                         )
 
@@ -247,7 +239,7 @@ class ShardedTensorLoader:
                 del tensors
                 gc.collect()
 
-    def _switch_shard(self, shard_name: str) -> None:
+    def _switch_shard(self, shard_name: str):
         """Load a new shard only when necessary."""
 
         if shard_name == self.current_shard_name:
@@ -267,10 +259,20 @@ class ShardedTensorLoader:
         self.current_shard_name = shard_name
 
     def get(self, tensor_name: str) -> torch.Tensor:
-        """Return tensor by HF tensor name."""
+        """
+        Return tensor by name.
+
+        Some Qwen3 checkpoints tie lm_head.weight with embedding.
+        If lm_head.weight is absent, reuse embedding weight.
+        """
+
+        original_name = tensor_name
 
         if tensor_name not in self.weight_map:
-            raise KeyError(f"Tensor not found: {tensor_name}")
+            if tensor_name == "lm_head.weight":
+                tensor_name = "model.embed_tokens.weight"
+            else:
+                raise KeyError(f"Tensor not found: {original_name}")
 
         shard_name = self.weight_map[tensor_name]
 
@@ -287,138 +289,83 @@ class ShardedTensorLoader:
 
 
 # ============================================================
-# tensor order aligned with C++ loader
+# tensor order
 # ============================================================
 
 
 def build_export_order(num_layers: int):
     """
-    Export tensor order must match C++ offset order exactly.
-
-    This order supports both:
-
-    1. Qwen3Model::create_param_layers()
-    2. Qwen3FusedModel::create_param_layers()
-
-    because the fused loader reads several consecutive tensors as one fused block:
-    - q + k + v
-    - q_norm + k_norm
-    - gate + up
+    IMPORTANT:
+    Keep EXACTLY identical to the original reference exporter.
     """
 
     names = []
 
-    # --------------------------------------------------------
-    # 1. Embedding
-    # C++:
-    #   embedding_layer_->set_weight(... weight_ptr(offset))
-    #   offset += vocab_size * hidden_dim
-    # --------------------------------------------------------
-
-    names += ["model.embed_tokens.weight"]
-
-    # --------------------------------------------------------
-    # 2. Pre RMSNorm / input_layernorm
-    # C++:
-    #   for each layer:
-    #       input_layernorm
-    # --------------------------------------------------------
-
+    # RMSNorms
     names += [
         f"model.layers.{i}.input_layernorm.weight"
         for i in range(num_layers)
     ]
-
-    # --------------------------------------------------------
-    # 3. Attention QKV per layer
-    #
-    # Non-fused C++ reads:
-    #   q, k, v
-    #
-    # Fused C++ reads the same contiguous memory as:
-    #   qkv = q + k + v
-    # --------------------------------------------------------
-
-    for i in range(num_layers):
-        names += [
-            f"model.layers.{i}.self_attn.q_proj.weight",
-            f"model.layers.{i}.self_attn.k_proj.weight",
-            f"model.layers.{i}.self_attn.v_proj.weight",
-        ]
-
-    # --------------------------------------------------------
-    # 4. q_norm / k_norm per layer
-    #
-    # Non-fused C++ reads:
-    #   q_norm, k_norm
-    #
-    # Fused C++ reads:
-    #   qk_norm = q_norm + k_norm
-    # --------------------------------------------------------
-
-    for i in range(num_layers):
-        names += [
-            f"model.layers.{i}.self_attn.q_norm.weight",
-            f"model.layers.{i}.self_attn.k_norm.weight",
-        ]
-
-    # --------------------------------------------------------
-    # 5. Attention O projection
-    # --------------------------------------------------------
-
-    names += [
-        f"model.layers.{i}.self_attn.o_proj.weight"
-        for i in range(num_layers)
-    ]
-
-    # --------------------------------------------------------
-    # 6. FFN RMSNorm / post_attention_layernorm
-    # --------------------------------------------------------
 
     names += [
         f"model.layers.{i}.post_attention_layernorm.weight"
         for i in range(num_layers)
     ]
 
-    # --------------------------------------------------------
-    # 7. FFN gate + up per layer
-    #
-    # Non-fused C++ reads:
-    #   gate, up
-    #
-    # Fused C++ reads:
-    #   gate_up = gate + up
-    # --------------------------------------------------------
+    names += ["model.norm.weight"]
 
-    for i in range(num_layers):
-        names += [
-            f"model.layers.{i}.mlp.gate_proj.weight",
-            f"model.layers.{i}.mlp.up_proj.weight",
-        ]
+    # embedding
+    names += ["model.embed_tokens.weight"]
 
-    # --------------------------------------------------------
-    # 8. FFN down projection
-    # --------------------------------------------------------
+    # attention
+    names += [
+        f"model.layers.{i}.self_attn.q_proj.weight"
+        for i in range(num_layers)
+    ]
+
+    names += [
+        f"model.layers.{i}.self_attn.q_norm.weight"
+        for i in range(num_layers)
+    ]
+
+    names += [
+        f"model.layers.{i}.self_attn.k_proj.weight"
+        for i in range(num_layers)
+    ]
+
+    names += [
+        f"model.layers.{i}.self_attn.k_norm.weight"
+        for i in range(num_layers)
+    ]
+
+    names += [
+        f"model.layers.{i}.self_attn.v_proj.weight"
+        for i in range(num_layers)
+    ]
+
+    names += [
+        f"model.layers.{i}.self_attn.o_proj.weight"
+        for i in range(num_layers)
+    ]
+
+    # mlp
+    names += [
+        f"model.layers.{i}.mlp.gate_proj.weight"
+        for i in range(num_layers)
+    ]
 
     names += [
         f"model.layers.{i}.mlp.down_proj.weight"
         for i in range(num_layers)
     ]
 
-    # --------------------------------------------------------
-    # 9. Final RMSNorm
-    # --------------------------------------------------------
+    names += [
+        f"model.layers.{i}.mlp.up_proj.weight"
+        for i in range(num_layers)
+    ]
 
-    names += ["model.norm.weight"]
-
-    # --------------------------------------------------------
-    # 10. lm_head.weight is intentionally NOT written.
-    #
-    # Your C++ code uses:
-    #   lm_head_layer_->set_weight(... raw_model_data_->weight_ptr(0), ...)
-    #
-    # So lm_head is tied to embedding.
-    # --------------------------------------------------------
+    # lm head
+    names += ["lm_head.weight"]
 
     return names
 
@@ -443,7 +390,7 @@ def expected_shape(name: str, cfg: dict):
     if name == "model.norm.weight":
         return (hidden_size,)
 
-    if name == "model.embed_tokens.weight":
+    if name in ("model.embed_tokens.weight", "lm_head.weight"):
         return (vocab_size, hidden_size)
 
     for i in range(num_layers):
@@ -486,29 +433,6 @@ def expected_shape(name: str, cfg: dict):
 
 
 # ============================================================
-# helper: expected fp32 count
-# ============================================================
-
-
-def expected_fp32_count_from_order(export_order, cfg: dict) -> int:
-    total = 0
-
-    for name in export_order:
-        shape = expected_shape(name, cfg)
-
-        if shape is None:
-            raise RuntimeError(f"Cannot infer expected shape for tensor: {name}")
-
-        numel = 1
-        for dim in shape:
-            numel *= dim
-
-        total += numel
-
-    return total
-
-
-# ============================================================
 # main export
 # ============================================================
 
@@ -540,20 +464,22 @@ def export_model(model_dir: str, out_file: str, no_shape_check: bool = False):
     # --------------------------------------------------------
     # IMPORTANT
     # --------------------------------------------------------
+    # Keep exactly same semantics as original exporter.
     #
-    # Qwen3-0.6B:
+    # Qwen3-0.6B is a special-looking case:
     #   hidden_size = 1024
     #   num_attention_heads = 16
     #   head_dim = 128
-    #   dim = 16 * 128 = 2048
+    #   dim = num_heads * head_dim = 2048
     #
-    # So dim must be num_heads * head_dim,
-    # not hidden_size.
+    # Therefore dim must NOT be blindly changed to hidden_size.
+    #
+    # dim        = total Q/O attention projection dimension
+    # hidden_dim = transformer hidden state size
     # --------------------------------------------------------
 
     dim = num_heads * head_dim
     hidden_dim = hidden_size
-    kv_dim = num_kv_heads * head_dim
 
     print("=" * 60)
     print("Model config")
@@ -567,24 +493,12 @@ def export_model(model_dir: str, out_file: str, no_shape_check: bool = False):
     print(f"head_dim         : {head_dim}")
     print(f"dim              : {dim}")
     print(f"hidden_dim       : {hidden_dim}")
-    print(f"kv_dim           : {kv_dim}")
     print(f"vocab_size       : {vocab_size}")
     print(f"max_seq_len      : {max_seq_len}")
 
     loader = ShardedTensorLoader(str(model_dir))
 
     export_order = build_export_order(num_layers)
-
-    expected_fp32_count = expected_fp32_count_from_order(export_order, cfg)
-    expected_file_size = 8 * 4 + expected_fp32_count * 4
-
-    print("=" * 60)
-    print("Export layout")
-    print("=" * 60)
-    print(f"num_tensors      : {len(export_order)}")
-    print(f"write_lm_head    : False")
-    print(f"expected_fp32    : {expected_fp32_count}")
-    print(f"expected_size    : {expected_file_size} bytes")
 
     out_path = Path(out_file)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -614,6 +528,7 @@ def export_model(model_dir: str, out_file: str, no_shape_check: bool = False):
         print("=" * 60)
 
         for tensor_name in tqdm(export_order):
+
             tensor = loader.get(tensor_name)
 
             if not no_shape_check:
@@ -629,21 +544,10 @@ def export_model(model_dir: str, out_file: str, no_shape_check: bool = False):
 
             serialize_fp32(f, tensor)
 
-    actual_file_size = out_path.stat().st_size
-
     print("=" * 60)
     print("Export completed")
     print("=" * 60)
-    print(f"Output file      : {out_path}")
-    print(f"Actual size      : {actual_file_size} bytes")
-    print(f"Expected size    : {expected_file_size} bytes")
-
-    if actual_file_size != expected_file_size:
-        raise RuntimeError(
-            "Output file size mismatch!\n"
-            f"actual   : {actual_file_size}\n"
-            f"expected : {expected_file_size}"
-        )
+    print(f"Output file: {out_path}")
 
 
 # ============================================================
@@ -654,7 +558,7 @@ def export_model(model_dir: str, out_file: str, no_shape_check: bool = False):
 def main():
 
     parser = argparse.ArgumentParser(
-        description="Qwen3 dense HF -> fp32 .bin exporter aligned with C++ loader"
+        description="Qwen3 dense HF -> fp32 .bin exporter"
     )
 
     parser.add_argument(
@@ -689,6 +593,7 @@ def main():
 
     args = parser.parse_args()
 
+    # convenience presets
     if args.preset is not None:
         args.model_dir, args.out_file = PRESETS[args.preset]
 

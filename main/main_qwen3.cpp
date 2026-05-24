@@ -1,86 +1,121 @@
 #include <chrono>
 #include <iostream>
+#include <vector>
+#include <cstdint>
+
+#include <cuda_runtime_api.h>
+
 #include <glog/logging.h>
 #include "model/qwen3.h"
 // #include "model/qwen3_fused.h"
 
-int32_t generate(const model::Qwen3Model& model, const std::string& sentence, int total_steps, double& TTFT, double& TPOT, bool need_output = false) {
-    // 在此处记录首字延迟 TTFT 的起始时间
-    auto ttft_start = std::chrono::steady_clock::now();
-    bool is_first_token = true; // 标记是否为第一个生成的 token
+#define CUDA_CHECK(expr)                                                                    \
+    do {                                                                                    \
+        cudaError_t err = (expr);                                                           \
+        LOG_IF(FATAL, err != cudaSuccess) << "CUDA error: " << cudaGetErrorString(err);     \
+    } while (0)
 
-    // 用于计算平均生成延迟 TPOT 的变量
-    double total_latency = 0.0; // 后续所有 token 的总耗时
-    int gen_token_count = 0; // 生成的 token 总数（含第一个）
-    auto last_token_time = std::chrono::steady_clock::now(); // 上一个 token 的生成时间
+static inline void sync_cuda() {
+    CUDA_CHECK(cudaDeviceSynchronize());
+}
+
+int32_t generate(const model::Qwen3Model& model, const std::string& sentence, int total_steps, double& TTFT, double& TPOT, bool need_output = false) {
+    using Clock = std::chrono::steady_clock;
+
+    TTFT = 0.0;
+    TPOT = 0.0;
 
     std::vector<int32_t> input_token_ids = model.encode(sentence);
     LOG_IF(FATAL, input_token_ids.empty()) << "input token ids is empty!" << std::endl;
 
-    int32_t prompt_len = static_cast<int32_t>(input_token_ids.size());
+    const int32_t prompt_len = static_cast<int32_t>(input_token_ids.size());
+
     const op::EmbeddingResult& prompt_embedding_result = model.embedding(input_token_ids);
-    
+
     bool is_prompt = true;
     tensor::Tensor token_pos = model.get_buffer(model::ModelBufferType::TokenPosition);
+
     int32_t pos = 0;
     int32_t next_token_id = input_token_ids.at(pos);
-    // std::vector<int32_t> generated_token_ids { input_token_ids.at(0) };
+
     std::vector<int32_t> generated_token_ids;
+
+    int32_t decode_token_count = 0;
+
+    bool first_token_generated = false;
+    Clock::time_point infer_start_time;
+    Clock::time_point first_token_time;
+    Clock::time_point last_token_time;
+
+    // 清理之前可能残留的 CUDA 异步任务，避免污染本次计时。
+    sync_cuda();
+
+    // benchmark 通常不把 tokenizer / encode 时间算入 TTFT。
+    // 如果你想测端到端 TTFT，可以把这行移动到 model.encode(sentence) 之前。
+    infer_start_time = Clock::now();
 
     while (pos < total_steps) {
         token_pos.index<int32_t>(0) = pos;
+
         if (pos < prompt_len - 1) {
+            // Prefill 阶段：处理 prompt。
+            // 不要每一步都 sync，否则会人为拉高 TTFT。
             const tensor::Tensor& token_embedding = model.get_embedding(token_pos, prompt_embedding_result, is_prompt);
             STATUS_CHECK(model.predict(token_embedding, token_pos, is_prompt, next_token_id));
         } else {
+            // Decode 阶段：开始生成新 token。
             is_prompt = false;
-            std::vector<int32_t> token_ids { next_token_id };
+            std::vector<int32_t> token_ids{next_token_id};
             const op::EmbeddingResult& token_embedding_result = model.embedding(token_ids);
             const tensor::Tensor& token_embedding = model.get_embedding(token_pos, token_embedding_result, is_prompt);
             STATUS_CHECK(model.predict(token_embedding, token_pos, is_prompt, next_token_id));
 
-            // 在此处计算首字延迟 TTFT (仅在生成第一个 token 时计算一次)
-            if (is_first_token) {
-                auto ttft_end = std::chrono::steady_clock::now();
-                TTFT = std::chrono::duration<double>(ttft_end - ttft_start).count();
-                is_first_token = false;
+            // CUDA 是异步执行的。这里必须同步，否则 chrono 测到的是 launch 时间。
+            sync_cuda();
 
-                // 初始化平均延迟相关变量
-                last_token_time = ttft_end;
-                gen_token_count = 1;
-            } else {
-                // 计算当前 token 与上一个 token 的时间差，并累加
-                auto current_time = std::chrono::steady_clock::now();
-                double token_latency = std::chrono::duration<double>(current_time - last_token_time).count();
-                total_latency += token_latency;
-                
-                // 更新上一个 token 的时间和计数
-                last_token_time = current_time;
-                gen_token_count += 1;
+            auto now = Clock::now();
+            decode_token_count++;
+            if (!first_token_generated) {
+                first_token_generated = true;
+                first_token_time = now;
             }
+            last_token_time = now;
 
-            if (next_token_id != 151645 && next_token_id != 151644) {
+            const bool is_special = (next_token_id == 151645 || next_token_id == 151644);
+            const bool is_end = model.is_sentence_end(next_token_id);
+            if (!is_special && !is_end) {
                 generated_token_ids.push_back(next_token_id);
             }
+            if (is_end) {
+                break;
+            }
         }
-        if (model.is_sentence_end(next_token_id)) {
-            break;
-        }
+
+        // 只有 prompt 阶段才从 input_token_ids 里取下一个 token。
+        // decode 阶段的 next_token_id 来自 model.predict。
         if (is_prompt) {
             next_token_id = input_token_ids.at(pos + 1);
         }
         pos += 1;
     }
 
-    // 循环结束后，计算平均生成延迟，若只生成了一个 token，平均延迟为 0（避免除以 0）
-    if (gen_token_count > 1) {
-        TPOT = total_latency / (gen_token_count - 1); // 排除第一个 token，取后续的平均
+    sync_cuda();
+
+    if (first_token_generated) {
+        TTFT = std::chrono::duration<double>(first_token_time - infer_start_time).count();
+    }
+
+    // TPOT 通常不包含第一个 token，因为第一个 token 的耗时已经计入 TTFT。
+    if (decode_token_count > 1) {
+        TPOT = std::chrono::duration<double>(last_token_time - first_token_time).count() / static_cast<double>(decode_token_count - 1);
     }
 
     if (need_output) {
         std::cout << model.decode(generated_token_ids) << std::endl;
     }
-    return pos;
+
+    // 返回生成阶段 token 数更适合算 decode 性能。
+    return decode_token_count;
 }
 
 std::string fill_template(const std::string& prompt) {
@@ -95,13 +130,15 @@ std::string fill_template(const std::string& prompt) {
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
-        LOG(INFO) << "Please use: ./qwen3_infer checkpoint_path(.bin) tokenizer_path(.model)" << std::endl;
+        LOG(INFO) << "Please use: ./qwen3_infer checkpoint_path(.bin) tokenizer_path(.model)"
+                  << std::endl;
         return -1;
     }
     const char* checkpoint_path = argv[1];
     const char* tokenizer_path = argv[2];
 
     bool is_quant_model = false;
+
     model::Qwen3Model model(base::TokenizerType::EncodeBpe, tokenizer_path, checkpoint_path, is_quant_model);
 
     base::Status status = model.init(base::DeviceType::DeviceCUDA);
@@ -111,26 +148,46 @@ int main(int argc, char* argv[]) {
 
     std::string prompt = "What is AI?";
     std::cout << prompt << std::endl;
-    const std::string& sentence = fill_template(prompt);
+    const std::string sentence = fill_template(prompt);
 
-    auto start = std::chrono::steady_clock().now();
+    std::cout << "Qwen3" << (is_quant_model ? "-quant8" : "") << " model warmup..." << std::endl;
+    {
+        double warmup_TTFT = 0.0;
+        double warmup_TPOT = 0.0;
+
+        // warmup：避免首次 CUDA 初始化、kernel 加载、显存分配污染正式结果。
+        // 如果你的 model 有 reset_kv_cache / clear_kv_cache 接口，建议 warmup 后调用。
+        generate(model, sentence, 128, warmup_TTFT, warmup_TPOT, false);
+    }
+
     std::cout << "Qwen3" << (is_quant_model ? "-quant8" : "") << " model generating..." << std::endl;
 
-    double TTFT = 0.0f;
-    double TPOT = 0.0f;
+    double TTFT = 0.0;
+    double TPOT = 0.0;
     const int32_t total_steps = 4096;
-    int32_t steps = generate(model, sentence, total_steps, TTFT, TPOT, true);
 
-    auto end = std::chrono::steady_clock().now();
-    auto duration = std::chrono::duration<double>(end - start).count();
+    sync_cuda();
+    auto start = std::chrono::steady_clock::now();
 
-    // 输出性能指标
+    int32_t decode_tokens = generate(model, sentence, total_steps, TTFT, TPOT, true);
+
+    sync_cuda();
+    auto end = std::chrono::steady_clock::now();
+
+    double duration = std::chrono::duration<double>(end - start).count();
+
     std::cout << "\n--------------- Performance Metrics ---------------" << std::endl;
-    std::cout << "steps: " << steps << std::endl;
+    std::cout << "decode_tokens: " << decode_tokens << std::endl;
     std::cout << "time(s): " << duration << std::endl;
-    std::cout << "steps/s: " << steps / duration << std::endl;
-    std::cout << "TTFT (First Token Latency): " << TTFT * 1000 << "ms" << std::endl;
-    std::cout << "TPOT (Average Token Latency): " << TPOT * 1000 << "ms" << std::endl;
+    if (duration > 0.0) {
+        std::cout << "decode_tokens/s_total: " << static_cast<double>(decode_tokens) / duration << std::endl;
+    }
+    std::cout << "TTFT (First Token Latency): " << TTFT * 1000.0 << " ms" << std::endl;
+    std::cout << "TPOT (Average Token Latency): " << TPOT * 1000.0 << " ms" << std::endl;
+    if (TPOT > 0.0) {
+        std::cout << "decode_tokens/s_after_first: " << 1.0 / TPOT << std::endl;
+    }
+    std::cout << "---------------------------------------------------" << std::endl;
 
     return 0;
 }

@@ -9,17 +9,16 @@ namespace op {
 // 计算公式为: 矩阵-向量乘法 y = wx = row_concat(w_q * x, w_k * x, w_v * x)
 class QKVMatmulLayer : public LayerParam {
 public:
-    explicit QKVMatmulLayer(base::DeviceType device_type, int32_t dim, int32_t kv_dim, int32_t dim0, int32_t dim1);
+    explicit QKVMatmulLayer(base::DeviceType device_type, int32_t dim, int32_t kv_dim, int32_t hidden_dim);
     
     base::Status check() const override;
     
     base::Status forward() override;
 
 private:
-    int32_t dim_;       // 向量 Q 的维度: head_num * head_dim
-    int32_t kv_dim_;    // 向量 KV 的维度: kv_head_num * head_dim
-    int32_t dim0_ = 0;  // 权重矩阵 w 的第 1 个维度
-    int32_t dim1_ = 0;  // 权重矩阵 w 的第 2 个维度
+    int32_t dim_;           // 向量 Q 的维度: head_num * head_dim
+    int32_t kv_dim_;        // 向量 KV 的维度: kv_head_num * head_dim
+    int32_t hidden_dim_;    // 权重矩阵: [dim + k_dim + v_dim, hidden_dim]
 };
 }  // namespace op
 

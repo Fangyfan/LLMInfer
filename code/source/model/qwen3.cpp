@@ -72,7 +72,7 @@ base::Status Qwen3Model::init(base::DeviceType device_type) {
     
     device_type_ = device_type;
     if (device_type_ == base::DeviceType::DeviceCUDA) {
-        if (cudaSetDevice(0) != cudaSuccess) {
+        if (cudaSetDevice(1) != cudaSuccess) {
             return base::error::internal_error("The cuda set device id failed.");
         }
         cuda_config_ = std::make_shared<kernel::CudaConfig>();
@@ -260,60 +260,51 @@ void Qwen3Model::create_param_layers() {
     int32_t max_seq_len = config_->max_seq_len;
     int32_t immediate_dim = config_->immediate_dim;
     
-    // 1. RMSNorm (Attention, FFN, Final) : [2 * layers + 1, hidden_dim]
-    for (int32_t i = 0; i < 2 * layer_num + 1; ++i) {
+    // 1. Embedding : [vocab_size, hidden_dim]
+    qwen3_layers_->embedding_layer_ = std::make_unique<op::EmbeddingLayer>(device_type_, hidden_dim, max_seq_len, vocab_size);
+    qwen3_layers_->embedding_layer_->set_weight(0, {vocab_size, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+    offset += vocab_size * hidden_dim;
+
+    // 2. Pre RMSNorm (Attention) : [2 * layers + 1, hidden_dim]
+    for (int32_t i = 0; i < layer_num; ++i) {
         auto rmsnorm = std::make_unique<op::RMSNormLaryer>(device_type_, hidden_dim);
         rmsnorm->set_weight(0, {hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         qwen3_layers_->rmsnorm_layers_.push_back(std::move(rmsnorm));
         offset += hidden_dim;
     }
 
-    // 2. Embedding : [vocab_size, hidden_dim]
-    qwen3_layers_->embedding_layer_ = std::make_unique<op::EmbeddingLayer>(device_type_, hidden_dim, max_seq_len, vocab_size);
-    qwen3_layers_->embedding_layer_->set_weight(0, {vocab_size, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
-    offset += vocab_size * hidden_dim;
-
-    // 3. Attention Wq : [layers, dim, hidden_dim]
+    // 3. Attention Wq / Wk / Wv : [layers, dim / kv_dim / kv_dim, hidden_dim]
     for (int32_t i = 0; i < layer_num; ++i) {
         auto wq = std::make_unique<op::MatmulLayer>(device_type_, dim, hidden_dim);
         wq->set_weight(0, {dim, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         qwen3_layers_->wq_layers_.push_back(std::move(wq));
         offset += dim * hidden_dim;
-    }
 
-    // 4. Attention q_norm : [layers, head_dim]
-    for (int32_t i = 0; i < layer_num; ++i) {
-        auto q_norm = std::make_unique<op::RMSNormLaryer>(device_type_, head_dim);
-        q_norm->set_weight(0, {head_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
-        qwen3_layers_->rmsnorm_layers_.push_back(std::move(q_norm));
-        offset += head_dim;
-    }
-
-    // 5. Attention Wk : [layers, kv_dim, hidden_dim]
-    for (int32_t i = 0; i < layer_num; ++i) {
         auto wk = std::make_unique<op::MatmulLayer>(device_type_, kv_dim, hidden_dim);
         wk->set_weight(0, {kv_dim, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         qwen3_layers_->wk_layers_.push_back(std::move(wk));
         offset += kv_dim * hidden_dim;
-    }
 
-    // 6. Attention k_norm : [layers, head_dim]
-    for (int32_t i = 0; i < layer_num; ++i) {
-        auto k_norm = std::make_unique<op::RMSNormLaryer>(device_type_, head_dim);
-        k_norm->set_weight(0, {head_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
-        qwen3_layers_->rmsnorm_layers_.push_back(std::move(k_norm));
-        offset += head_dim;
-    }
-
-    // 7. Attention Wv : [layers, kv_dim, hidden_dim]
-    for (int32_t i = 0; i < layer_num; ++i) {
         auto wv = std::make_unique<op::MatmulLayer>(device_type_, kv_dim, hidden_dim);
         wv->set_weight(0, {kv_dim, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         qwen3_layers_->wv_layers_.push_back(std::move(wv));
         offset += kv_dim * hidden_dim;
     }
 
-    // 8. Attention Wo : [layers, hidden_dim, dim]
+    // 4. Attention q_norm / k_norm : [layers, head_dim]
+    for (int32_t i = 0; i < layer_num; ++i) {
+        auto q_norm = std::make_unique<op::RMSNormLaryer>(device_type_, head_dim);
+        q_norm->set_weight(0, {head_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+        qwen3_layers_->rmsnorm_layers_.push_back(std::move(q_norm));
+        offset += head_dim;
+
+        auto k_norm = std::make_unique<op::RMSNormLaryer>(device_type_, head_dim);
+        k_norm->set_weight(0, {head_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+        qwen3_layers_->rmsnorm_layers_.push_back(std::move(k_norm));
+        offset += head_dim;
+    }
+
+    // 5. Attention Wo : [layers, hidden_dim, dim]
     for (int32_t i = 0; i < layer_num; ++i) {
         auto wo = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, dim);
         wo->set_weight(0, {hidden_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
@@ -321,15 +312,28 @@ void Qwen3Model::create_param_layers() {
         offset += hidden_dim * dim;
     }
 
-    // 9. FFN W1 (Gate)	: [layers, immediate_dim, hidden_dim]
+    // 6. Pre RMSNorm (FFN) : [2 * layers + 1, hidden_dim]
+    for (int32_t i = 0; i < layer_num; ++i) {
+        auto rmsnorm = std::make_unique<op::RMSNormLaryer>(device_type_, hidden_dim);
+        rmsnorm->set_weight(0, {hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+        qwen3_layers_->rmsnorm_layers_.push_back(std::move(rmsnorm));
+        offset += hidden_dim;
+    }
+
+    // 7. FFN W1 (Gate)	: [layers, immediate_dim, hidden_dim]
     for (int32_t i = 0; i < layer_num; ++i) {
         auto w1 = std::make_unique<op::MatmulLayer>(device_type_, immediate_dim, hidden_dim);
         w1->set_weight(0, {immediate_dim, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         qwen3_layers_->w1_layers_.push_back(std::move(w1));
         offset += immediate_dim * hidden_dim;
+
+        auto w3 = std::make_unique<op::MatmulLayer>(device_type_, immediate_dim, hidden_dim);
+        w3->set_weight(0, {immediate_dim, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+        qwen3_layers_->w3_layers_.push_back(std::move(w3));
+        offset += immediate_dim * hidden_dim;
     }
 
-    // 10. FFN W2 (Down) : [layers, hidden_dim, immediate_dim]
+    // 8. FFN W2 (Down) : [layers, hidden_dim, immediate_dim]
     for (int32_t i = 0; i < layer_num; ++i) {
         auto w2 = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, immediate_dim);
         w2->set_weight(0, {hidden_dim, immediate_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
@@ -337,17 +341,15 @@ void Qwen3Model::create_param_layers() {
         offset += hidden_dim * immediate_dim;
     }
 
-    // 11. FFN W3 (Up) : [layers, immediate_dim, hidden_dim]
-    for (int32_t i = 0; i < layer_num; ++i) {
-        auto w3 = std::make_unique<op::MatmulLayer>(device_type_, immediate_dim, hidden_dim);
-        w3->set_weight(0, {immediate_dim, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
-        qwen3_layers_->w3_layers_.push_back(std::move(w3));
-        offset += immediate_dim * hidden_dim;
-    }
+    // 9. Final RMSNorm : [2 * layers + 1, hidden_dim]
+    auto rmsnorm = std::make_unique<op::RMSNormLaryer>(device_type_, hidden_dim);
+    rmsnorm->set_weight(0, {hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+    qwen3_layers_->rmsnorm_layers_.push_back(std::move(rmsnorm));
+    offset += hidden_dim;
 
-    // 13. Output Head : [vocab_size, hidden_dim]
+    // 10. Output Head : [vocab_size, hidden_dim]
     qwen3_layers_->cls_layer_ = std::make_unique<op::MatmulLayer>(device_type_, vocab_size, hidden_dim);
-    qwen3_layers_->cls_layer_->set_weight(0, {vocab_size, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+    qwen3_layers_->cls_layer_->set_weight(0, {vocab_size, hidden_dim}, raw_model_data_->weight_ptr(0), base::DeviceType::DeviceCPU);
 }
 
 void Qwen3Model::create_param_quant_layers() {}
@@ -449,8 +451,8 @@ void Qwen3Model::attention_qkv_rope(int32_t layer_id, const tensor::Tensor& toke
     const auto& wk_layer = qwen3_layers_->wk_layers_.at(layer_id);
     const auto& wv_layer = qwen3_layers_->wv_layers_.at(layer_id);
 
-    const auto& q_norm = qwen3_layers_->rmsnorm_layers_.at(layer_id + 2 * layer_num + 1);
-    const auto& k_norm = qwen3_layers_->rmsnorm_layers_.at(layer_id + 3 * layer_num + 1);
+    const auto& q_norm = qwen3_layers_->rmsnorm_layers_.at(layer_num + 2 * layer_id);
+    const auto& k_norm = qwen3_layers_->rmsnorm_layers_.at(layer_num + 2 * layer_id + 1);
     
     const tensor::Tensor& input = get_buffer(ModelBufferType::MHAPreRMSNorm);
     STATUS_CHECK(wq_layer->forward(input, query));
@@ -497,7 +499,7 @@ void Qwen3Model::feed_forward(int32_t layer_id, const tensor::Tensor& input) con
     STATUS_CHECK(qwen3_layers_->add_layer_->forward(input, get_buffer(ModelBufferType::AttentionOuput), input));
 
     // 2. FFN 归一化: 对加完的数据再做一次 RMSNorm
-    const auto& ffn_rmsnorm = qwen3_layers_->rmsnorm_layers_.at(config_->layer_num + layer_id);
+    const auto& ffn_rmsnorm = qwen3_layers_->rmsnorm_layers_.at(3 * config_->layer_num + layer_id);
     const tensor::Tensor& output = get_buffer(ModelBufferType::FFNPreRMSNorm);
     STATUS_CHECK(ffn_rmsnorm->forward(input, output));
 
@@ -519,7 +521,7 @@ void Qwen3Model::feed_forward(int32_t layer_id, const tensor::Tensor& input) con
 
 void Qwen3Model::cls_logits(const tensor::Tensor& input) const {
     // 1. 最后再做一次 Final RMSNorm
-    const auto& final_rmsnorm = qwen3_layers_->rmsnorm_layers_.at(2 * config_->layer_num);
+    const auto& final_rmsnorm = qwen3_layers_->rmsnorm_layers_.at(4 * config_->layer_num);
     STATUS_CHECK(final_rmsnorm->forward(input, input));
     
     // 2. 将向量映射到词表大小，输出叫 Logits (未归一化的概率分值)

@@ -110,6 +110,7 @@ std::pair<tensor::Tensor, tensor::Tensor> Model::slice_kv_cache(int32_t layer_id
 tensor::Tensor Model::get_embedding(const tensor::Tensor& token_pos, const op::EmbeddingResult& embedding_result, bool is_prompt) const {
     // 1. 从 embedding_result 中获取嵌入向量
     const tensor::Tensor& token_embeddings = embedding_result.token_embeddings;
+    CHECK(token_embeddings.dims_size() == 2);
     // 2. Prompt 阶段 vs 生成阶段: 
     // 如果是 is_prompt（预填充阶段），根据位置 pos 获取对应的嵌入
     // 如果是生成阶段，则 index 为 0，因为此时 embeddings 中只有一个 embedding
