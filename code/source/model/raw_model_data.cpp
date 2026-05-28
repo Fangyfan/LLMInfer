@@ -16,6 +16,10 @@ RawModelData::~RawModelData() {
     }
 }
 
+const void* RawModelDataBf16::weight_ptr(size_t offset) const { // offset: 以 bf16 元素为单位的索引
+    return reinterpret_cast<uint16_t*>(weight_data) + offset;
+}
+
 const void* RawModelDataFp32::weight_ptr(size_t offset) const { // offset: 以 fp32 元素为单位的索引
     return reinterpret_cast<float*>(weight_data) + offset;
 }

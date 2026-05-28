@@ -100,19 +100,6 @@ static __global__ void argmax_kernel_2(
     }
 }
 
-void argmax(
-    const float* input,
-    int32_t size,
-    val_idx* temp,
-    int32_t* output,
-    cudaStream_t stream
-) {
-    dim3 gridDim(128);
-    dim3 blockDim(256);
-    argmax_kernel_1<256><<<gridDim, blockDim, 0, stream>>>(input, size, temp);
-    argmax_kernel_2<<<1, 32, 0, stream>>>(temp, output);
-}
-
 int32_t argmax_kernel_cu(
     const float* input, 
     int32_t size, /* 151936 */

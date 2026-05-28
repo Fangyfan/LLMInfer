@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Unified Qwen3 dense HF -> fp32 .bin exporter.
+Unified Qwen3 dense HF -> .bin exporter.
 
 This exporter is aligned with the following C++ loading layout:
 
@@ -54,7 +54,15 @@ header = int32[8]
     intermediate_size,
 ]
 
-followed by fp32 weights.
+followed by weights.
+
+Supported output dtype:
+- fp32: each weight element is 4 bytes
+- bf16: each weight element is 2 bytes, stored as raw little-endian bfloat16 bits
+
+Important:
+The header is unchanged for fp32 and bf16.
+Your C++ loader must know externally whether the weight payload is fp32 or bf16.
 
 Supports:
 - Qwen3-0.6B
@@ -71,14 +79,17 @@ Supports:
 Examples
 --------
 
-Qwen3-0.6B:
-python qwen3_dense_unified_converter.py --preset 0.6b
+Qwen3-0.6B fp32:
+python qwen3_dense_unified_converter.py --preset 0.6b --out_dtype fp32
 
-Qwen3-1.7B:
-python qwen3_dense_unified_converter.py --preset 1.7b
+Qwen3-0.6B bf16:
+python qwen3_dense_unified_converter.py --preset 0.6b --out_dtype bf16
 
-Qwen3-4B:
-python qwen3_dense_unified_converter.py --preset 4b
+Qwen3-1.7B bf16:
+python qwen3_dense_unified_converter.py --preset 1.7b --out_dtype bf16
+
+Qwen3-4B bf16:
+python qwen3_dense_unified_converter.py --preset 4b --out_dtype bf16
 
 Install dependencies:
 pip install torch safetensors tqdm
@@ -89,7 +100,7 @@ import gc
 import json
 import struct
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import torch
 from tqdm import tqdm
@@ -107,20 +118,20 @@ except ImportError as e:
 # ============================================================
 
 DEFAULT_06B_MODEL = "/home/yifanfang/LLMInfer/models/qwen3/Qwen3-0.6B"
-DEFAULT_06B_OUT = "/home/yifanfang/LLMInfer/models/qwen3/qwen3_0.6b_fp32.bin"
-
 DEFAULT_17B_MODEL = "/home/yifanfang/LLMInfer/models/qwen3/Qwen3-1.7B"
-DEFAULT_17B_OUT = "/home/yifanfang/LLMInfer/models/qwen3/qwen3_1.7b_fp32.bin"
-
 DEFAULT_4B_MODEL = "/home/yifanfang/LLMInfer/models/qwen3/Qwen3-4B"
-DEFAULT_4B_OUT = "/home/yifanfang/LLMInfer/models/qwen3/qwen3_4b_fp32.bin"
 
+DEFAULT_OUT_DIR = "/home/yifanfang/LLMInfer/models/qwen3"
 
-PRESETS = {
-    "0.6b": (DEFAULT_06B_MODEL, DEFAULT_06B_OUT),
-    "1.7b": (DEFAULT_17B_MODEL, DEFAULT_17B_OUT),
-    "4b": (DEFAULT_4B_MODEL, DEFAULT_4B_OUT),
+PRESETS: Dict[str, str] = {
+    "0.6b": DEFAULT_06B_MODEL,
+    "1.7b": DEFAULT_17B_MODEL,
+    "4b": DEFAULT_4B_MODEL,
 }
+
+
+def default_out_file_for_preset(preset: str, out_dtype: str) -> str:
+    return str(Path(DEFAULT_OUT_DIR) / f"qwen3_{preset}_{out_dtype}.bin")
 
 
 # ============================================================
@@ -128,24 +139,58 @@ PRESETS = {
 # ============================================================
 
 
-def serialize_fp32(file_obj, tensor: torch.Tensor) -> None:
+def serialize_weight(file_obj, tensor: torch.Tensor, out_dtype: str) -> None:
     """
-    Write tensor as contiguous little-endian fp32.
+    Write tensor payload.
 
-    This version avoids Python-level struct packing of every element,
-    which is much faster and uses less temporary memory.
+    fp32:
+        stored as little-endian float32, 4 bytes per element.
+
+    bf16:
+        stored as raw bfloat16 bits, 2 bytes per element.
+        This preserves bf16 storage format.
     """
 
-    arr = (
-        tensor.detach()
-        .cpu()
-        .contiguous()
-        .view(-1)
-        .to(torch.float32)
-        .numpy()
-    )
+    if out_dtype == "fp32":
+        arr = (
+            tensor.detach()
+            .cpu()
+            .contiguous()
+            .view(-1)
+            .to(torch.float32)
+            .numpy()
+        )
+        file_obj.write(arr.tobytes())
+        return
 
-    file_obj.write(arr.tobytes())
+    if out_dtype == "bf16":
+        # Convert to bf16 if the source tensor is not already bf16.
+        #
+        # Direct .numpy() on torch.bfloat16 is not supported in many PyTorch
+        # versions, so we reinterpret the bf16 tensor as uint16 and write the
+        # raw 16-bit bf16 payload.
+        bf16_tensor = (
+            tensor.detach()
+            .cpu()
+            .contiguous()
+            .view(-1)
+            .to(torch.bfloat16)
+        )
+
+        uint16_tensor = bf16_tensor.view(torch.uint16)
+        arr = uint16_tensor.numpy()
+        file_obj.write(arr.tobytes())
+        return
+
+    raise ValueError(f"Unsupported out_dtype: {out_dtype}")
+
+
+def bytes_per_element(out_dtype: str) -> int:
+    if out_dtype == "fp32":
+        return 4
+    if out_dtype == "bf16":
+        return 2
+    raise ValueError(f"Unsupported out_dtype: {out_dtype}")
 
 
 # ============================================================
@@ -179,10 +224,6 @@ class ShardedTensorLoader:
         index_path = self.model_dir / "model.safetensors.index.json"
         single_path = self.model_dir / "model.safetensors"
 
-        # ----------------------------------------------------
-        # sharded checkpoint with index
-        # ----------------------------------------------------
-
         if index_path.exists():
             with open(index_path, "r", encoding="utf-8") as f:
                 index_json = json.load(f)
@@ -194,10 +235,6 @@ class ShardedTensorLoader:
             print("Detected indexed sharded checkpoint:")
             for shard_name in shard_names:
                 print("   ", shard_name)
-
-        # ----------------------------------------------------
-        # single model.safetensors checkpoint
-        # ----------------------------------------------------
 
         elif single_path.exists():
             tensors = safe_load_file(str(single_path), device="cpu")
@@ -212,10 +249,6 @@ class ShardedTensorLoader:
 
             print("Detected single safetensors checkpoint:")
             print("   ", single_path.name)
-
-        # ----------------------------------------------------
-        # fallback: scan model-*.safetensors
-        # ----------------------------------------------------
 
         else:
             shard_paths = sorted(self.model_dir.glob("model-*.safetensors"))
@@ -308,37 +341,16 @@ def build_export_order(num_layers: int):
 
     names = []
 
-    # --------------------------------------------------------
     # 1. Embedding
-    # C++:
-    #   embedding_layer_->set_weight(... weight_ptr(offset))
-    #   offset += vocab_size * hidden_dim
-    # --------------------------------------------------------
-
     names += ["model.embed_tokens.weight"]
 
-    # --------------------------------------------------------
     # 2. Pre RMSNorm / input_layernorm
-    # C++:
-    #   for each layer:
-    #       input_layernorm
-    # --------------------------------------------------------
-
     names += [
         f"model.layers.{i}.input_layernorm.weight"
         for i in range(num_layers)
     ]
 
-    # --------------------------------------------------------
     # 3. Attention QKV per layer
-    #
-    # Non-fused C++ reads:
-    #   q, k, v
-    #
-    # Fused C++ reads the same contiguous memory as:
-    #   qkv = q + k + v
-    # --------------------------------------------------------
-
     for i in range(num_layers):
         names += [
             f"model.layers.{i}.self_attn.q_proj.weight",
@@ -346,79 +358,43 @@ def build_export_order(num_layers: int):
             f"model.layers.{i}.self_attn.v_proj.weight",
         ]
 
-    # --------------------------------------------------------
     # 4. q_norm / k_norm per layer
-    #
-    # Non-fused C++ reads:
-    #   q_norm, k_norm
-    #
-    # Fused C++ reads:
-    #   qk_norm = q_norm + k_norm
-    # --------------------------------------------------------
-
     for i in range(num_layers):
         names += [
             f"model.layers.{i}.self_attn.q_norm.weight",
             f"model.layers.{i}.self_attn.k_norm.weight",
         ]
 
-    # --------------------------------------------------------
     # 5. Attention O projection
-    # --------------------------------------------------------
-
     names += [
         f"model.layers.{i}.self_attn.o_proj.weight"
         for i in range(num_layers)
     ]
 
-    # --------------------------------------------------------
     # 6. FFN RMSNorm / post_attention_layernorm
-    # --------------------------------------------------------
-
     names += [
         f"model.layers.{i}.post_attention_layernorm.weight"
         for i in range(num_layers)
     ]
 
-    # --------------------------------------------------------
     # 7. FFN gate + up per layer
-    #
-    # Non-fused C++ reads:
-    #   gate, up
-    #
-    # Fused C++ reads:
-    #   gate_up = gate + up
-    # --------------------------------------------------------
-
     for i in range(num_layers):
         names += [
             f"model.layers.{i}.mlp.gate_proj.weight",
             f"model.layers.{i}.mlp.up_proj.weight",
         ]
 
-    # --------------------------------------------------------
     # 8. FFN down projection
-    # --------------------------------------------------------
-
     names += [
         f"model.layers.{i}.mlp.down_proj.weight"
         for i in range(num_layers)
     ]
 
-    # --------------------------------------------------------
     # 9. Final RMSNorm
-    # --------------------------------------------------------
-
     names += ["model.norm.weight"]
 
-    # --------------------------------------------------------
     # 10. lm_head.weight is intentionally NOT written.
-    #
-    # Your C++ code uses:
-    #   lm_head_layer_->set_weight(... raw_model_data_->weight_ptr(0), ...)
-    #
-    # So lm_head is tied to embedding.
-    # --------------------------------------------------------
+    # C++ ties lm_head to embedding by using weight_ptr(0).
 
     return names
 
@@ -428,7 +404,7 @@ def build_export_order(num_layers: int):
 # ============================================================
 
 
-def expected_shape(name: str, cfg: dict):
+def expected_shape(name: str, cfg: dict) -> Optional[Tuple[int, ...]]:
     hidden_size = int(cfg["hidden_size"])
     intermediate_size = int(cfg["intermediate_size"])
     num_layers = int(cfg["num_hidden_layers"])
@@ -485,12 +461,7 @@ def expected_shape(name: str, cfg: dict):
     return None
 
 
-# ============================================================
-# helper: expected fp32 count
-# ============================================================
-
-
-def expected_fp32_count_from_order(export_order, cfg: dict) -> int:
+def expected_element_count_from_order(export_order, cfg: dict) -> int:
     total = 0
 
     for name in export_order:
@@ -500,8 +471,8 @@ def expected_fp32_count_from_order(export_order, cfg: dict) -> int:
             raise RuntimeError(f"Cannot infer expected shape for tensor: {name}")
 
         numel = 1
-        for dim in shape:
-            numel *= dim
+        for d in shape:
+            numel *= d
 
         total += numel
 
@@ -513,7 +484,15 @@ def expected_fp32_count_from_order(export_order, cfg: dict) -> int:
 # ============================================================
 
 
-def export_model(model_dir: str, out_file: str, no_shape_check: bool = False):
+def export_model(
+    model_dir: str,
+    out_file: str,
+    out_dtype: str = "fp32",
+    no_shape_check: bool = False,
+) -> None:
+
+    if out_dtype not in ("fp32", "bf16"):
+        raise ValueError(f"Unsupported out_dtype: {out_dtype}")
 
     model_dir = Path(model_dir)
 
@@ -537,19 +516,13 @@ def export_model(model_dir: str, out_file: str, no_shape_check: bool = False):
 
     head_dim = int(cfg.get("head_dim", hidden_size // num_heads))
 
-    # --------------------------------------------------------
-    # IMPORTANT
-    # --------------------------------------------------------
-    #
     # Qwen3-0.6B:
     #   hidden_size = 1024
     #   num_attention_heads = 16
     #   head_dim = 128
     #   dim = 16 * 128 = 2048
     #
-    # So dim must be num_heads * head_dim,
-    # not hidden_size.
-    # --------------------------------------------------------
+    # So dim must be num_heads * head_dim, not hidden_size.
 
     dim = num_heads * head_dim
     hidden_dim = hidden_size
@@ -570,20 +543,22 @@ def export_model(model_dir: str, out_file: str, no_shape_check: bool = False):
     print(f"kv_dim           : {kv_dim}")
     print(f"vocab_size       : {vocab_size}")
     print(f"max_seq_len      : {max_seq_len}")
+    print(f"out_dtype        : {out_dtype}")
 
     loader = ShardedTensorLoader(str(model_dir))
 
     export_order = build_export_order(num_layers)
 
-    expected_fp32_count = expected_fp32_count_from_order(export_order, cfg)
-    expected_file_size = 8 * 4 + expected_fp32_count * 4
+    expected_element_count = expected_element_count_from_order(export_order, cfg)
+    expected_file_size = 8 * 4 + expected_element_count * bytes_per_element(out_dtype)
 
     print("=" * 60)
     print("Export layout")
     print("=" * 60)
     print(f"num_tensors      : {len(export_order)}")
     print(f"write_lm_head    : False")
-    print(f"expected_fp32    : {expected_fp32_count}")
+    print(f"elements         : {expected_element_count}")
+    print(f"bytes_per_element: {bytes_per_element(out_dtype)}")
     print(f"expected_size    : {expected_file_size} bytes")
 
     out_path = Path(out_file)
@@ -619,15 +594,14 @@ def export_model(model_dir: str, out_file: str, no_shape_check: bool = False):
             if not no_shape_check:
                 expected = expected_shape(tensor_name, cfg)
 
-                if expected is not None:
-                    if tuple(tensor.shape) != expected:
-                        raise RuntimeError(
-                            f"Shape mismatch for {tensor_name}\n"
-                            f"got      : {tuple(tensor.shape)}\n"
-                            f"expected : {expected}"
-                        )
+                if expected is not None and tuple(tensor.shape) != expected:
+                    raise RuntimeError(
+                        f"Shape mismatch for {tensor_name}\n"
+                        f"got      : {tuple(tensor.shape)}\n"
+                        f"expected : {expected}"
+                    )
 
-            serialize_fp32(f, tensor)
+            serialize_weight(f, tensor, out_dtype)
 
     actual_file_size = out_path.stat().st_size
 
@@ -635,6 +609,7 @@ def export_model(model_dir: str, out_file: str, no_shape_check: bool = False):
     print("Export completed")
     print("=" * 60)
     print(f"Output file      : {out_path}")
+    print(f"Output dtype     : {out_dtype}")
     print(f"Actual size      : {actual_file_size} bytes")
     print(f"Expected size    : {expected_file_size} bytes")
 
@@ -654,23 +629,21 @@ def export_model(model_dir: str, out_file: str, no_shape_check: bool = False):
 def main():
 
     parser = argparse.ArgumentParser(
-        description="Qwen3 dense HF -> fp32 .bin exporter aligned with C++ loader"
+        description="Qwen3 dense HF -> .bin exporter aligned with C++ loader"
     )
 
     parser.add_argument(
         "--model_dir",
         type=str,
-        required=False,
-        default=DEFAULT_17B_MODEL,
+        default=None,
         help="Path to HF Qwen3 model directory",
     )
 
     parser.add_argument(
         "--out_file",
         type=str,
-        required=False,
-        default=DEFAULT_17B_OUT,
-        help="Output fp32 .bin path",
+        default=None,
+        help="Output .bin path",
     )
 
     parser.add_argument(
@@ -682,6 +655,14 @@ def main():
     )
 
     parser.add_argument(
+        "--out_dtype",
+        type=str,
+        default="fp32",
+        choices=["fp32", "bf16"],
+        help="Output weight dtype: fp32 or bf16",
+    )
+
+    parser.add_argument(
         "--no_shape_check",
         action="store_true",
         help="Disable tensor shape validation",
@@ -690,11 +671,21 @@ def main():
     args = parser.parse_args()
 
     if args.preset is not None:
-        args.model_dir, args.out_file = PRESETS[args.preset]
+        model_dir = PRESETS[args.preset]
+        out_file = args.out_file or default_out_file_for_preset(
+            args.preset,
+            args.out_dtype,
+        )
+    else:
+        model_dir = args.model_dir or DEFAULT_17B_MODEL
+        out_file = args.out_file or str(
+            Path(DEFAULT_OUT_DIR) / f"qwen3_1.7b_{args.out_dtype}.bin"
+        )
 
     export_model(
-        model_dir=args.model_dir,
-        out_file=args.out_file,
+        model_dir=model_dir,
+        out_file=out_file,
+        out_dtype=args.out_dtype,
         no_shape_check=args.no_shape_check,
     )
 

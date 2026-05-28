@@ -57,7 +57,9 @@ enum class ModelType : uint8_t {
 };
 
 inline size_t data_type_size(DataType data_type) {
-    if (data_type == DataType::DataTypeFp32) {
+    if (data_type == DataType::DataTypeBf16) {
+        return sizeof(uint16_t);
+    } else if (data_type == DataType::DataTypeFp32) {
         return sizeof(float);
     } else if (data_type == DataType::DataTypeInt32) {
         return sizeof(int32_t);

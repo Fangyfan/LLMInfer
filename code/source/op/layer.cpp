@@ -39,7 +39,7 @@ void BaseLayer::set_device_type(base::DeviceType device_type) {
 }
 
 Layer::Layer(base::DeviceType device_type, LayerType layer_type, std::string layer_name)
-: BaseLayer(device_type, layer_type, base::DataType::DataTypeFp32, layer_name) {}
+: BaseLayer(device_type, layer_type, base::DataType::DataTypeBf16, layer_name) {}
 
 base::Status Layer::init() {
     return base::error::success();
@@ -237,7 +237,7 @@ const tensor::Tensor& LayerParam::get_weight(int32_t idx) const {
 base::Status LayerParam::set_weight(int32_t idx, const tensor::Tensor& weight) {
     CHECK_GE(idx, 0);
     CHECK_LT(idx, weights_.size());
-    CHECK(weight.data_type() == base::DataType::DataTypeFp32);
+    CHECK(weight.data_type() == base::DataType::DataTypeBf16);
     if (!weight.is_empty()) {
         CHECK(weight.device_type() == device_type_);
     }
@@ -251,8 +251,8 @@ base::Status LayerParam::set_weight(int32_t idx, const std::vector<int32_t>& dim
     CHECK_NE(weight_ptr, nullptr);
 
     if (!is_quant_layer_) {
-        // 创建 Fp32 类型的 Tensor 权重参数，同时创建 Buffer 使用 weight_ptr 所指向的外部内存/显存
-        tensor::Tensor weight(base::DataType::DataTypeFp32, dims, false, nullptr, const_cast<void*>(weight_ptr));
+        // 创建 Bf16 类型的 Tensor 权重参数，同时创建 Buffer 使用 weight_ptr 所指向的外部内存/显存
+        tensor::Tensor weight(base::DataType::DataTypeBf16, dims, false, nullptr, const_cast<void*>(weight_ptr));
         weight.set_device_type(device_type); // 当没有 allocator 来构造 buffer 时，需要手动设置 device_type
         weights_.at(idx) = weight;
     } else {

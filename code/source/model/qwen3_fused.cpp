@@ -278,7 +278,7 @@ void Qwen3FusedModel::create_param_layers() {
 
     // 5. Fused_O_Proj_Add (w_o) : [layers, hidden_dim, dim]
     for (int32_t i = 0; i < layer_num; ++i) {
-        auto w_o = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, dim, true); // fuse_add = true
+        auto w_o = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, dim, false, true); // fuse_add = true
         w_o->set_weight(0, {hidden_dim, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         qwen3_fused_layers_->fused_o_proj_add_layers_.push_back(std::move(w_o));
         offset += hidden_dim * dim;
@@ -302,7 +302,7 @@ void Qwen3FusedModel::create_param_layers() {
 
     // 8. Fused_Down_Add (w_down) : [layers, hidden_dim, immediate_dim]
     for (int32_t i = 0; i < layer_num; ++i) {
-        auto w_down = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, immediate_dim, true); // fuse_add = true
+        auto w_down = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, immediate_dim, false, true); // fuse_add = true
         w_down->set_weight(0, {hidden_dim, immediate_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
         qwen3_fused_layers_->fused_down_proj_add_layers_.push_back(std::move(w_down));
         offset += hidden_dim * immediate_dim;
@@ -314,7 +314,7 @@ void Qwen3FusedModel::create_param_layers() {
     offset += hidden_dim;
 
     // 10. LM_Head : [vocab_size, hidden_dim] and tie_word_embedding = true
-    qwen3_fused_layers_->lm_head_layer_ = std::make_unique<op::MatmulLayer>(device_type_, vocab_size, hidden_dim);
+    qwen3_fused_layers_->lm_head_layer_ = std::make_unique<op::MatmulLayer>(device_type_, vocab_size, hidden_dim, true); // lm_head = true
     qwen3_fused_layers_->lm_head_layer_->set_weight(0, {vocab_size, hidden_dim}, raw_model_data_->weight_ptr(0), base::DeviceType::DeviceCPU);
 }
 
@@ -347,7 +347,7 @@ void Qwen3FusedModel::allocate_model_buffers() {
     insert_buffer(ModelBufferType::TokenIds, token_ids);
     insert_buffer(ModelBufferType::TokenPosition, token_pos);
 
-    tensor::Tensor token_embeddings(base::DataType::DataTypeFp32, 1, hidden_dim, true, allocator);
+    tensor::Tensor token_embeddings(base::DataType::DataTypeBf16, 1, hidden_dim, true, allocator);
     insert_buffer(ModelBufferType::TokenEmbeddings, token_embeddings);
 
     tensor::Tensor sin_cache(base::DataType::DataTypeFp32, max_seq_len, head_dim / 2, true, allocator);
@@ -355,24 +355,24 @@ void Qwen3FusedModel::allocate_model_buffers() {
     insert_buffer(ModelBufferType::SinCache, sin_cache);
     insert_buffer(ModelBufferType::CosCache, cos_cache);
 
-    tensor::Tensor key_cache(base::DataType::DataTypeFp32, layer_num, max_seq_len, kv_dim, true, allocator);
-    tensor::Tensor value_cache(base::DataType::DataTypeFp32, layer_num, max_seq_len, kv_dim, true, allocator);
+    tensor::Tensor key_cache(base::DataType::DataTypeBf16, layer_num, max_seq_len, kv_dim, true, allocator);
+    tensor::Tensor value_cache(base::DataType::DataTypeBf16, layer_num, max_seq_len, kv_dim, true, allocator);
     insert_buffer(ModelBufferType::KeyCache, key_cache);
     insert_buffer(ModelBufferType::ValueCache, value_cache);
 
-    tensor::Tensor norm_input(base::DataType::DataTypeFp32, hidden_dim, true, allocator);
+    tensor::Tensor norm_input(base::DataType::DataTypeBf16, hidden_dim, true, allocator);
     insert_buffer(ModelBufferType::MHAPreRMSNorm, norm_input);
     insert_buffer(ModelBufferType::FFNPreRMSNorm, norm_input);
 
-    tensor::Tensor query(base::DataType::DataTypeFp32, dim, true, allocator);
-    tensor::Tensor gqa_output(base::DataType::DataTypeFp32, dim, true, allocator);
+    tensor::Tensor query(base::DataType::DataTypeBf16, dim, true, allocator);
+    tensor::Tensor gqa_output(base::DataType::DataTypeBf16, dim, true, allocator);
     insert_buffer(ModelBufferType::Query, query);
     insert_buffer(ModelBufferType::MHAOutput, gqa_output);
 
     tensor::Tensor kv_split_output(base::DataType::DataTypeFp32, head_num, 4 * max_seq_len, true, allocator);
     insert_buffer(ModelBufferType::KVSplitOutput, kv_split_output);
 
-    tensor::Tensor swiglu_output(base::DataType::DataTypeFp32, immediate_dim, true, allocator);
+    tensor::Tensor swiglu_output(base::DataType::DataTypeBf16, immediate_dim, true, allocator);
     insert_buffer(ModelBufferType::SwiGLUOutput, swiglu_output);
 
     tensor::Tensor logits(base::DataType::DataTypeFp32, vocab_size, true, allocator);

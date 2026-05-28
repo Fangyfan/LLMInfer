@@ -1,18 +1,19 @@
 #include "embedding_kernel.cuh"
+#include <cuda_bf16.h>
 
 namespace kernel {
-static __global__ void embedding_kernel(
+static __global__ void embedding_bf16x8_kernel(
     const int32_t* __restrict__ input, 
-    const float* __restrict__ weight, 
-    float* output, 
+    const __nv_bfloat16* __restrict__ weight, 
+    __nv_bfloat16* output, 
     int32_t hidden_dim
 ) {
-    int32_t hidden_dim4 = hidden_dim >> 2;
+    int32_t hidden_dim8 = (hidden_dim >> 3);
     int32_t token_id = input[blockIdx.x];
-    const float4* wei4 = reinterpret_cast<const float4*>(weight + token_id * hidden_dim);
-    float4* out4 = reinterpret_cast<float4*>(output + blockIdx.x * hidden_dim);
-    for (int32_t i = threadIdx.x; i < hidden_dim4; i += blockDim.x) {
-        out4[i] = wei4[i];
+    const uint4* wei8 = reinterpret_cast<const uint4*>(weight + token_id * hidden_dim);
+    uint4* out8 = reinterpret_cast<uint4*>(output + blockIdx.x * hidden_dim);
+    for (int32_t i = threadIdx.x; i < hidden_dim8; i += blockDim.x) {
+        out8[i] = wei8[i];
     }
 }
 
@@ -25,6 +26,11 @@ void embedding_kernel_cu(
     CHECK(!input.is_empty() && input.dims_size() == 1);
     CHECK(!weight.is_empty() && weight.dims_size() == 2);
     CHECK(!output.is_empty() && output.dims_size() == 2);
+
+    CHECK(input.data_type() == base::DataType::DataTypeInt32);
+    CHECK(weight.data_type() == base::DataType::DataTypeBf16);
+    CHECK(output.data_type() == base::DataType::DataTypeBf16);
+
     CHECK(input.device_type() == base::DeviceType::DeviceCPU);
     CHECK(weight.device_type() == base::DeviceType::DeviceCUDA);
     CHECK(output.device_type() == base::DeviceType::DeviceCUDA);
@@ -39,6 +45,9 @@ void embedding_kernel_cu(
     CHECK_EQ(output.get_dim(0), token_num);
     CHECK_EQ(output.get_dim(1), hidden_dim);
 
+    CHECK_EQ(reinterpret_cast<uintptr_t>(weight.ptr<uint16_t>()) % 16, 0);
+    CHECK_EQ(reinterpret_cast<uintptr_t>(output.ptr<uint16_t>()) % 16, 0);
+
     for (int32_t i = 0; i < input.size(); ++i) {
         int32_t token_id = input.index<int32_t>(i);
         CHECK_GE(token_id, 0);
@@ -46,12 +55,13 @@ void embedding_kernel_cu(
     }
     
     const int32_t* in = input_cu.ptr<int32_t>();
-    const float* wei = weight.ptr<float>();
-    float* out = const_cast<float*>(output.ptr<float>());
+    const __nv_bfloat16* wei = reinterpret_cast<const __nv_bfloat16*>(weight.ptr<uint16_t>());
+    __nv_bfloat16* out = reinterpret_cast<__nv_bfloat16*>(const_cast<uint16_t*>(output.ptr<uint16_t>()));
     
-    CHECK(hidden_dim % 4 == 0);
+    CHECK(hidden_dim % 8 == 0);
     dim3 gridDim(token_num);
-    dim3 blockDim(512);
-    embedding_kernel<<<gridDim, blockDim, 0, stream_>>>(in, wei, out, hidden_dim);
+    dim3 blockDim(256);
+    embedding_bf16x8_kernel<<<gridDim, blockDim, 0, stream_>>>(in, wei, out, hidden_dim);
+    cudaStreamSynchronize(stream_);
 }
 }  // namespace kernel

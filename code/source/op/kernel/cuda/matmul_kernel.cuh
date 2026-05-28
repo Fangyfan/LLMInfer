@@ -8,7 +8,7 @@ void gemv_kernel_cu(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 
     const tensor::Tensor& output, 
-    float scale, 
+    bool lm_head, 
     void* stream
 );
 

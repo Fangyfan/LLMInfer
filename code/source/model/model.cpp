@@ -96,11 +96,11 @@ std::pair<tensor::Tensor, tensor::Tensor> Model::slice_kv_cache(int32_t layer_id
     const tensor::Tensor& key_cache = get_buffer(model::ModelBufferType::KeyCache);
     const tensor::Tensor& value_cache = get_buffer(model::ModelBufferType::ValueCache);
 
-    float* key_ptr = const_cast<float*>(key_cache.ptr<float>(cache_offset));
-    float* value_ptr = const_cast<float*>(value_cache.ptr<float>(cache_offset));
+    uint16_t* key_ptr = const_cast<uint16_t*>(key_cache.ptr<uint16_t>(cache_offset));
+    uint16_t* value_ptr = const_cast<uint16_t*>(value_cache.ptr<uint16_t>(cache_offset));
     
-    tensor::Tensor key(base::DataType::DataTypeFp32, config_->kv_dim, false, nullptr, key_ptr);
-    tensor::Tensor value(base::DataType::DataTypeFp32, config_->kv_dim, false, nullptr, value_ptr);
+    tensor::Tensor key(base::DataType::DataTypeBf16, config_->kv_dim, false, nullptr, key_ptr);
+    tensor::Tensor value(base::DataType::DataTypeBf16, config_->kv_dim, false, nullptr, value_ptr);
     key.set_device_type(device_type_);
     value.set_device_type(device_type_);
     return std::make_pair(key, value);
@@ -119,8 +119,8 @@ tensor::Tensor Model::get_embedding(const tensor::Tensor& token_pos, const op::E
         index = token_pos.index<int32_t>(0);
     }
     // 3. 零拷贝构造：创建一个 base::Buffer，让它直接指向 embedding_output 的内存地址（避免数据拷贝），然后封装成 Tensor 返回
-    float* ptr = const_cast<float*>(token_embeddings.ptr<float>(index * config_->hidden_dim));
-    tensor::Tensor token_embedding(base::DataType::DataTypeFp32, config_->hidden_dim, false, nullptr, ptr);
+    uint16_t* ptr = const_cast<uint16_t*>(token_embeddings.ptr<uint16_t>(index * config_->hidden_dim));
+    tensor::Tensor token_embedding(base::DataType::DataTypeBf16, config_->hidden_dim, false, nullptr, ptr);
     token_embedding.set_device_type(device_type_);
     return token_embedding;
 }
@@ -176,7 +176,7 @@ base::Status Model::read_model_file() {
     
     // 5. 指针定位：计算权重数据在内存中的起始位置：weight_data = data (起始地址) + sizeof(ModelConfig) (跳过头信息)
     if (!is_quant_model_) {
-        raw_model_data_ = std::make_unique<RawModelDataFp32>();
+        raw_model_data_ = std::make_unique<RawModelDataBf16>();
     } else {
         raw_model_data_ = std::make_unique<RawModelDataInt8>();
     }

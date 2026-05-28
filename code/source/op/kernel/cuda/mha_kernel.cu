@@ -14,10 +14,10 @@ static __device__ __forceinline__ float warp_reduce_sum(float val) {
 
 template <int32_t BLOCK_DIM, int32_t Bc>
 static __global__ __launch_bounds__(BLOCK_DIM) void flashattention_gqa_kernel(
-    const float* __restrict__ query,
-    const float* __restrict__ key_cache,
-    const float* __restrict__ value_cache,
-    float* __restrict__ output,
+    const __nv_bfloat16* __restrict__ query,
+    const __nv_bfloat16* __restrict__ key_cache,
+    const __nv_bfloat16* __restrict__ value_cache,
+    __nv_bfloat16* __restrict__ output,
     int32_t layer_offset,
     int32_t seq_len,
     int32_t kv_dim,
@@ -25,13 +25,13 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashattention_gqa_kernel(
     int32_t head_dim,
     float scale
 ) {
-    extern __shared__ float shared_mem[];
-    float* s_Q = shared_mem;            // [head_dim]
-    float* s_K = s_Q + head_dim;        // [Bc, head_dim]
-    float* s_V = s_K + Bc * head_dim;   // [Bc, head_dim]
-    float* s_O = s_V + Bc * head_dim;   // [head_dim]
-    float* s_S = s_O + head_dim;        // [Bc]
-    float* s_P = s_S + Bc;              // [Bc]
+    extern __shared__ __align__(16) unsigned char shared_mem[];
+    __nv_bfloat16* s_Q = reinterpret_cast<__nv_bfloat16*>(shared_mem);  // [head_dim]
+    __nv_bfloat16* s_K = s_Q + head_dim;                                // [Bc, head_dim]
+    __nv_bfloat16* s_V = s_K + Bc * head_dim;                           // [Bc, head_dim]
+    float* s_O = reinterpret_cast<float*>(s_V + Bc * head_dim);         // [head_dim]
+    float* s_S = s_O + head_dim;                                        // [Bc]
+    float* s_P = s_S + Bc;                                              // [Bc]
 
     // 单 block 负责一个 Q head，适合短上下文，避免 split path 的二次 kernel launch
     const int32_t head_id = blockIdx.x;
@@ -45,7 +45,8 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashattention_gqa_kernel(
     s_Q[threadIdx.x] = query[head_id * head_dim + threadIdx.x];
     s_O[threadIdx.x] = 0.0f;
     __syncthreads();
-    float4 q4 = reinterpret_cast<float4*>(s_Q)[lane];
+    // 每个线程搬运 4 个 bf16 数据 s_Q[i...i+3]
+    uint2 q4 = reinterpret_cast<uint2*>(s_Q)[lane];
     
     float old_max = -INFINITY;
     float old_exp_sum = 0.0f;
@@ -64,8 +65,13 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashattention_gqa_kernel(
         // 每个 warp 计算一行点积: dot(q, k^T)，1 个 block 有 4 个 warp，每次计算 4 行 k
 #pragma unroll
         for (int32_t i = 0; i < Bc; i += 4) {
-            float4 k4 = reinterpret_cast<float4*>(s_K + (i + warp) * head_dim)[lane];
-            float qk = (q4.x * k4.x) + (q4.y * k4.y) + (q4.z * k4.z) + (q4.w * k4.w);
+            uint2 k4 = reinterpret_cast<uint2*>(s_K + (i + warp) * head_dim)[lane];
+            const __nv_bfloat162* q2 = reinterpret_cast<const __nv_bfloat162*>(&q4);
+            const __nv_bfloat162* k2 = reinterpret_cast<const __nv_bfloat162*>(&k4);
+            float qk = __bfloat162float(q2[0].x) * __bfloat162float(k2[0].x) 
+                     + __bfloat162float(q2[0].y) * __bfloat162float(k2[0].y)
+                     + __bfloat162float(q2[1].x) * __bfloat162float(k2[1].x)
+                     + __bfloat162float(q2[1].y) * __bfloat162float(k2[1].y);
             qk = warp_reduce_sum<32>(qk);
             if (lane == 0) {
                 s_S[i + warp] = scale * qk;
@@ -97,7 +103,7 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashattention_gqa_kernel(
         float new_O = exp_scale * s_O[threadIdx.x];
 #pragma unroll
         for (int32_t i = 0; i < Bc; ++i) {
-            new_O += s_P[i] * s_V[i * head_dim + threadIdx.x];
+            new_O += s_P[i] * __bfloat162float(s_V[i * head_dim + threadIdx.x]);
         }
         s_O[threadIdx.x] = new_O;
         __syncthreads();
@@ -111,8 +117,13 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashattention_gqa_kernel(
         __syncthreads();
         
         for (int32_t i = 0; i < seq_len_remain; i += 4) {
-            float4 k4 = reinterpret_cast<float4*>(s_K + (i + warp) * head_dim)[lane];
-            float qk = (q4.x * k4.x) + (q4.y * k4.y) + (q4.z * k4.z) + (q4.w * k4.w);
+            uint2 k4 = reinterpret_cast<uint2*>(s_K + (i + warp) * head_dim)[lane];
+            const __nv_bfloat162* q2 = reinterpret_cast<const __nv_bfloat162*>(&q4);
+            const __nv_bfloat162* k2 = reinterpret_cast<const __nv_bfloat162*>(&k4);
+            float qk = __bfloat162float(q2[0].x) * __bfloat162float(k2[0].x) 
+                     + __bfloat162float(q2[0].y) * __bfloat162float(k2[0].y)
+                     + __bfloat162float(q2[1].x) * __bfloat162float(k2[1].x)
+                     + __bfloat162float(q2[1].y) * __bfloat162float(k2[1].y);
             qk = warp_reduce_sum<32>(qk);
             if (lane == 0) {
                 s_S[i + warp] = scale * qk;
@@ -140,20 +151,20 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashattention_gqa_kernel(
 
         float new_O = exp_scale * s_O[threadIdx.x];
         for (int32_t i = 0; i < seq_len_remain; ++i) {
-            new_O += s_P[i] * s_V[i * head_dim + threadIdx.x];
+            new_O += s_P[i] * __bfloat162float(s_V[i * head_dim + threadIdx.x]);
         }
         s_O[threadIdx.x] = new_O;
         __syncthreads();
     }
 
-    output[head_id * head_dim + threadIdx.x] = s_O[threadIdx.x] / old_exp_sum;
+    output[head_id * head_dim + threadIdx.x] = __float2bfloat16(s_O[threadIdx.x] / old_exp_sum);
 }
 
 template <int32_t BLOCK_DIM, int32_t Bc>
 static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_split_kernel(
-    const float* __restrict__ query,
-    const float* __restrict__ key_cache,
-    const float* __restrict__ value_cache,
+    const __nv_bfloat16* __restrict__ query,
+    const __nv_bfloat16* __restrict__ key_cache,
+    const __nv_bfloat16* __restrict__ value_cache,
     float* __restrict__ kv_split_output,
     int32_t layer_offset,
     int32_t seq_len,
@@ -164,13 +175,13 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_split_kern
     int32_t kv_split_num,
     float scale
 ) {
-    extern __shared__ float shared_mem[];
-    float* s_Q = shared_mem;            // [head_dim]
-    float* s_K = s_Q + head_dim;        // [Bc, head_dim]
-    float* s_V = s_K + Bc * head_dim;   // [Bc, head_dim]
-    float* s_O = s_V + Bc * head_dim;   // [head_dim]
-    float* s_S = s_O + head_dim;        // [Bc]
-    float* s_P = s_S + Bc;              // [Bc]
+    extern __shared__ __align__(16) unsigned char shared_mem[];
+    __nv_bfloat16* s_Q = reinterpret_cast<__nv_bfloat16*>(shared_mem);  // [head_dim]
+    __nv_bfloat16* s_K = s_Q + head_dim;                                // [Bc, head_dim]
+    __nv_bfloat16* s_V = s_K + Bc * head_dim;                           // [Bc, head_dim]
+    float* s_O = reinterpret_cast<float*>(s_V + Bc * head_dim);         // [head_dim]
+    float* s_S = s_O + head_dim;                                        // [Bc]
+    float* s_P = s_S + Bc;                                              // [Bc]
     
     // grid.y = q head
     // grid.x = kv split id
@@ -193,7 +204,8 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_split_kern
     s_Q[threadIdx.x] = query[head_id * head_dim + threadIdx.x];
     s_O[threadIdx.x] = 0.0f;
     __syncthreads();
-    float4 q4 = reinterpret_cast<float4*>(s_Q)[lane];
+    // 每个线程搬运 4 个 bf16 数据 s_Q[i...i+3]
+    uint2 q4 = reinterpret_cast<uint2*>(s_Q)[lane];
     
     float old_max = -INFINITY;
     float old_exp_sum = 0.0f;
@@ -208,8 +220,13 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_split_kern
         
 #pragma unroll
         for (int32_t i = 0; i < Bc; i += 4) {
-            float4 k4 = reinterpret_cast<float4*>(s_K + (i + warp) * head_dim)[lane];
-            float qk = (q4.x * k4.x) + (q4.y * k4.y) + (q4.z * k4.z) + (q4.w * k4.w);
+            uint2 k4 = reinterpret_cast<uint2*>(s_K + (i + warp) * head_dim)[lane];
+            const __nv_bfloat162* q2 = reinterpret_cast<const __nv_bfloat162*>(&q4);
+            const __nv_bfloat162* k2 = reinterpret_cast<const __nv_bfloat162*>(&k4);
+            float qk = __bfloat162float(q2[0].x) * __bfloat162float(k2[0].x) 
+                     + __bfloat162float(q2[0].y) * __bfloat162float(k2[0].y)
+                     + __bfloat162float(q2[1].x) * __bfloat162float(k2[1].x)
+                     + __bfloat162float(q2[1].y) * __bfloat162float(k2[1].y);
             qk = warp_reduce_sum<32>(qk);
             if (lane == 0) {
                 s_S[i + warp] = scale * qk;
@@ -240,7 +257,7 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_split_kern
         float new_O = exp_scale * s_O[threadIdx.x];
 #pragma unroll
         for (int32_t i = 0; i < Bc; ++i) {
-            new_O += s_P[i] * s_V[i * head_dim + threadIdx.x];
+            new_O += s_P[i] * __bfloat162float(s_V[i * head_dim + threadIdx.x]);
         }
         s_O[threadIdx.x] = new_O;
         __syncthreads();
@@ -254,8 +271,13 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_split_kern
         __syncthreads();
         
         for (int32_t i = 0; i < kv_split_end_remain; i += 4) {
-            float4 k4 = reinterpret_cast<float4*>(s_K + (i + warp) * head_dim)[lane];
-            float qk = (q4.x * k4.x) + (q4.y * k4.y) + (q4.z * k4.z) + (q4.w * k4.w);
+            uint2 k4 = reinterpret_cast<uint2*>(s_K + (i + warp) * head_dim)[lane];
+            const __nv_bfloat162* q2 = reinterpret_cast<const __nv_bfloat162*>(&q4);
+            const __nv_bfloat162* k2 = reinterpret_cast<const __nv_bfloat162*>(&k4);
+            float qk = __bfloat162float(q2[0].x) * __bfloat162float(k2[0].x) 
+                     + __bfloat162float(q2[0].y) * __bfloat162float(k2[0].y)
+                     + __bfloat162float(q2[1].x) * __bfloat162float(k2[1].x)
+                     + __bfloat162float(q2[1].y) * __bfloat162float(k2[1].y);
             qk = warp_reduce_sum<32>(qk);
             if (lane == 0) {
                 s_S[i + warp] = scale * qk;
@@ -283,7 +305,7 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_split_kern
 
         float new_O = exp_scale * s_O[threadIdx.x];
         for (int32_t i = 0; i < kv_split_end_remain; ++i) {
-            new_O += s_P[i] * s_V[i * head_dim + threadIdx.x];
+            new_O += s_P[i] * __bfloat162float(s_V[i * head_dim + threadIdx.x]);
         }
         s_O[threadIdx.x] = new_O;
         __syncthreads();
@@ -309,7 +331,7 @@ static __device__ __forceinline__ float warp_reduce_max(float val) {
 template <int32_t BLOCK_DIM>
 static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_combine_kernel(
     const float* __restrict__ kv_split_output,
-    float* __restrict__ output,
+    __nv_bfloat16* __restrict__ output,
     int32_t head_dim,
     int32_t kv_split_size,
     int32_t kv_split_num
@@ -318,8 +340,8 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_combine_ke
     const int32_t lane = threadIdx.x & 31;
     kv_split_output += head_id * kv_split_num * (head_dim + 2);
 
-    extern __shared__ float shared_mem[];
-    float* partial_max = shared_mem;
+    extern __shared__ __align__(16) unsigned char shared_mem[];
+    float* partial_max = reinterpret_cast<float*>(shared_mem);
     float* partial_exp_sum = partial_max + kv_split_num;
 
     for (int32_t kv_split_id = threadIdx.x; kv_split_id < kv_split_num; kv_split_id += BLOCK_DIM) {
@@ -344,7 +366,7 @@ static __global__ __launch_bounds__(BLOCK_DIM) void flashdecoding_gqa_combine_ke
     for (int32_t kv_split_id = 0; kv_split_id < kv_split_num; ++kv_split_id) {
         final_out += kv_split_output[kv_split_id * head_dim + threadIdx.x] * __expf(partial_max[kv_split_id] - max);
     }
-    output[head_id * head_dim + threadIdx.x] = final_out / exp_sum;
+    output[head_id * head_dim + threadIdx.x] = __float2bfloat16(final_out / exp_sum);
 }
 
 void mha_kernel_cu(
@@ -363,15 +385,21 @@ void mha_kernel_cu(
     void* stream
 ) {
     CHECK(!query.is_empty());
-    CHECK(!kv_split_output.is_empty());
     CHECK(!key_cache.is_empty());
     CHECK(!value_cache.is_empty());
+    CHECK(!kv_split_output.is_empty());
     CHECK(!output.is_empty());
 
+    CHECK(query.data_type() == base::DataType::DataTypeBf16);
+    CHECK(key_cache.data_type() == base::DataType::DataTypeBf16);
+    CHECK(value_cache.data_type() == base::DataType::DataTypeBf16);
+    CHECK(kv_split_output.data_type() == base::DataType::DataTypeFp32);
+    CHECK(output.data_type() == base::DataType::DataTypeBf16);
+
     CHECK(query.device_type() == base::DeviceType::DeviceCUDA);
-    CHECK(kv_split_output.device_type() == base::DeviceType::DeviceCUDA);
     CHECK(key_cache.device_type() == base::DeviceType::DeviceCUDA);
     CHECK(value_cache.device_type() == base::DeviceType::DeviceCUDA);
+    CHECK(kv_split_output.device_type() == base::DeviceType::DeviceCUDA);
     CHECK(output.device_type() == base::DeviceType::DeviceCUDA);
 
     CHECK(pos >= 0);
@@ -382,11 +410,11 @@ void mha_kernel_cu(
     constexpr int32_t thread_num = 128;
     CHECK(head_dim == thread_num);
 
-    const float* query_ptr = query.ptr<float>();
+    const __nv_bfloat16* query_ptr = reinterpret_cast<const __nv_bfloat16*>(query.ptr<uint16_t>());
     float* kv_split_output_ptr = const_cast<float*>(kv_split_output.ptr<float>());
-    const float* key_cache_ptr = key_cache.ptr<float>();
-    const float* value_cache_ptr = value_cache.ptr<float>();
-    float* output_ptr = const_cast<float*>(output.ptr<float>());
+    const __nv_bfloat16* key_cache_ptr = reinterpret_cast<const __nv_bfloat16*>(key_cache.ptr<uint16_t>());
+    const __nv_bfloat16* value_cache_ptr = reinterpret_cast<const __nv_bfloat16*>(value_cache.ptr<uint16_t>());
+    __nv_bfloat16* output_ptr = reinterpret_cast<__nv_bfloat16*>(const_cast<uint16_t*>(output.ptr<uint16_t>()));
 
     const float scale = rsqrtf(static_cast<float>(head_dim));
     const int32_t layer_offset = layer_id * max_seq_len * kv_dim;
@@ -395,11 +423,12 @@ void mha_kernel_cu(
     cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
 
     // shared memory:
-    //   s_Q / s_O: [head_dim] floats
-    //   s_K / s_V: [Bc * head_dim] floats
-    //   s_S / s_P: [Bc] floats
+    //   s_Q: [head_dim] bf16
+    //   s_K / s_V: [Bc * head_dim] bf16
+    //   s_O: [head_dim] float32
+    //   s_S / s_P: [Bc] float32
     constexpr int32_t Bc = 32;
-    const int32_t shared_size = 2 * (head_dim + Bc * head_dim + Bc) * sizeof(float);
+    const int32_t shared_size = (head_dim + 2 * Bc * head_dim) * sizeof(uint16_t) + (head_dim + 2 * Bc) * sizeof(float);
     if (seq_len <= 128) {
         flashattention_gqa_kernel<thread_num, Bc><<<head_num, thread_num, shared_size, stream_>>>(
             query_ptr, key_cache_ptr, value_cache_ptr, output_ptr, layer_offset, seq_len, kv_dim, kv_mul, head_dim, scale

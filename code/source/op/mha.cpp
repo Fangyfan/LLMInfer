@@ -25,7 +25,7 @@ base::Status MultiHeadAttention::check() const {
         LOG(ERROR) << "The input value_cache tensor error in the matmul layer." << std::endl;
         return status;
     }
-    status = check_tensor_with_dim(get_input(3), device_type_, data_type_, head_num_, 4 * max_seq_len_);
+    status = check_tensor_with_dim(get_input(3), device_type_, base::DataType::DataTypeFp32, head_num_, 4 * max_seq_len_);
     if (!status) {
         LOG(ERROR) << "The input kv_split_output tensor error in the matmul layer." << std::endl;
         return status;

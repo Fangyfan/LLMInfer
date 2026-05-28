@@ -30,12 +30,12 @@ base::Status RoPELayer::check() const {
         LOG(ERROR) << "The input token pos error in the rope layer." << std::endl;
         return status;
     }
-    status = check_tensor(sin_cache, device_type_, data_type_);
+    status = check_tensor(sin_cache, device_type_, base::DataType::DataTypeFp32);
     if (!status) {
         LOG(ERROR) << "The sin cache error in the rope layer." << std::endl;
         return status;
     }
-    status = check_tensor(cos_cache, device_type_, data_type_);
+    status = check_tensor(cos_cache, device_type_, base::DataType::DataTypeFp32);
     if (!status) {
         LOG(ERROR) << "The cos cache error in the rope layer." << std::endl;
         return status;

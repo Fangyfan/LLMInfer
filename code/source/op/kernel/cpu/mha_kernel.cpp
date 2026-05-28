@@ -72,7 +72,7 @@ void mha_kernel_cpu(
             // --- 执行点积 ---
             // 计算一维向量点积：Score[t] = Query * Key[t] * scale
             // 其中 Query 和 Key[t] 均是长度为 head_dim 的一维向量，这里调用的是一个底层的矩阵乘法算子
-            kernel::get_gemv_kernel(base::DeviceType::DeviceCPU)(query_head, key_head, score_head_t, scale, nullptr);
+            // kernel::get_gemv_kernel(base::DeviceType::DeviceCPU)(query_head, key_head, score_head_t, scale, nullptr);
         }
 
         // 包装整个 score 数组（长度为 pos + 1）

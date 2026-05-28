@@ -2,8 +2,8 @@
 #include "kernel/kernel_interface.h"
 
 namespace op {
-MatmulLayer::MatmulLayer(base::DeviceType device_type, int32_t dim0, int32_t dim1, bool fuse_add, bool is_quant_layer)
-: LayerParam(device_type, LayerType::LayerMatmul, is_quant_layer, "Matmul"), dim0_(dim0), dim1_(dim1), fuse_add_(fuse_add) {
+MatmulLayer::MatmulLayer(base::DeviceType device_type, int32_t dim0, int32_t dim1, bool lm_head, bool fuse_add, bool is_quant_layer)
+: LayerParam(device_type, LayerType::LayerMatmul, is_quant_layer, "Matmul"), dim0_(dim0), dim1_(dim1), lm_head_(lm_head), fuse_add_(fuse_add) {
     reset_inputs_size(1);
     reset_weights_size(1);
     reset_outputs_size(1);
@@ -33,7 +33,7 @@ base::Status MatmulLayer::check() const {
             return status;
         }
     }
-    status = check_tensor_with_dim(get_output(0), device_type_, data_type_, dim0_);
+    status = check_tensor_with_dim(get_output(0), device_type_, !lm_head_ ? data_type_ : base::DataType::DataTypeFp32, dim0_);
     if (!status) {
         LOG(ERROR) << "The output tensor error in the matmul layer." << std::endl;
         return status;
@@ -52,16 +52,17 @@ base::Status MatmulLayer::forward() {
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         CHECK_NE(cuda_config_, nullptr);
     }
-    if (!is_quant_layer_) {
-        if (!fuse_add_) {
-            kernel::get_gemv_kernel(device_type_)(input, weight, output, 1.0f, cuda_config_ ? cuda_config_->stream : nullptr);
-        } else {
-            kernel::get_fused_gemv_add_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream : nullptr);
-        }
+    CHECK(!is_quant_layer_);
+    if (!fuse_add_) {
+        kernel::get_gemv_kernel(device_type_)(input, weight, output, lm_head_, cuda_config_ ? cuda_config_->stream : nullptr);
     } else {
-        CHECK(device_type_ == base::DeviceType::DeviceCUDA);
-        kernel::get_gemv_int8_kernel(device_type_)(input, weight, output, scales_, group_size_, cuda_config_->stream);
+        kernel::get_fused_gemv_add_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream : nullptr);
     }
+    // if (!is_quant_layer_) {
+    // } else {
+    //     CHECK(device_type_ == base::DeviceType::DeviceCUDA);
+    //     kernel::get_gemv_int8_kernel(device_type_)(input, weight, output, scales_, group_size_, cuda_config_->stream);
+    // }
     return base::error::success();
 }
 

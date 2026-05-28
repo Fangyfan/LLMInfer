@@ -4,8 +4,6 @@
 #include "tensor/tensor.h"
 
 namespace kernel {
-void softmax_kernel_cu(const tensor::Tensor& input, void* stream);
-
 void mha_kernel_cu(
     const tensor::Tensor& query,
     const tensor::Tensor& key_cache,

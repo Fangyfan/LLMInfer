@@ -1,4 +1,5 @@
 #include "rope_kernel.cuh"
+#include <cuda_bf16.h>
 
 namespace kernel {
 
@@ -9,13 +10,13 @@ static __global__ void sin_cos_cache_kernel(
     int32_t max_seq_len
 ) {
     int32_t i = blockIdx.x;
-    int32_t half = head_dim / 2;
+    int32_t half_dim = head_dim / 2;
 
     const float freq = 1.0f / powf(1000000.0f, (2.0f * i) / head_dim);
 
     for (int32_t pos = threadIdx.x; pos < max_seq_len; pos += blockDim.x) {
         float theta = static_cast<float>(pos) * freq;
-        sincosf(theta, sin_cache + pos * half + i, cos_cache + pos * half + i);
+        sincosf(theta, sin_cache + pos * half_dim + i, cos_cache + pos * half_dim + i);
     }
 }
 
@@ -28,6 +29,10 @@ void sin_cos_cache_precompute_cu(
 ) {
     CHECK(!sin_cache.is_empty());
     CHECK(!cos_cache.is_empty());
+    
+    CHECK(sin_cache.data_type() == base::DataType::DataTypeFp32);
+    CHECK(cos_cache.data_type() == base::DataType::DataTypeFp32);
+
     CHECK(sin_cache.device_type() == base::DeviceType::DeviceCUDA);
     CHECK(cos_cache.device_type() == base::DeviceType::DeviceCUDA);
 
@@ -41,23 +46,26 @@ void sin_cos_cache_precompute_cu(
 }
 
 static __global__ void rope_kernel(
-    float* __restrict__ q, 
-    float* __restrict__ k, 
+    __nv_bfloat16* __restrict__ q, 
+    __nv_bfloat16* __restrict__ k, 
     const float* __restrict__ sptr, 
     const float* __restrict__ cptr, 
     int32_t dim, 
     int32_t kv_dim, 
     int32_t head_dim
-) {
+) {    
     // 当前线程负责第 tid 个 pair
     int32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= dim / 2) {
+        return;
+    }
 
-    // 每个 head 里面有 half 个 pair(i, i + half)
-    int32_t half = head_dim / 2;
+    // 每个 head 里面有 half_dim 个 pair(i, i + half_dim)
+    int32_t half_dim = head_dim / 2;
 
-    // 计算第 tid 个 pair 在第几个 head 以及 head 内的偏移量 i，表示 head 内的 pair(i, i + half)
-    int32_t head_id = tid / half;
-    int32_t pair_id = tid % half;
+    // 计算第 tid 个 pair 在第几个 head 以及 head 内的偏移量 i，表示 head 内的 pair(i, i + half_dim)
+    int32_t head_id = tid / half_dim;
+    int32_t pair_id = tid % half_dim;
 
     // 当 head_offset < kv_dim 时需要旋转 q 和 k，否则只需要旋转 q
     int32_t head_offset = head_id * head_dim;
@@ -68,11 +76,13 @@ static __global__ void rope_kernel(
     float cos_theta = cptr[pair_id];
 
     for (int32_t r = 0; r < rotn; ++r) {
-        float* v = static_cast<float*>(r == 0 ? q : k) + head_offset;
-        float a = v[pair_id];
-        float b = v[pair_id + half];
-        v[pair_id] = a * cos_theta - b * sin_theta;
-        v[pair_id + half] = a * sin_theta + b * cos_theta;
+        __nv_bfloat16* v = static_cast<__nv_bfloat16*>(r == 0 ? q : k) + head_offset;
+        float a = __bfloat162float(v[pair_id]);
+        float b = __bfloat162float(v[pair_id + half_dim]);
+        float a1 = a * cos_theta - b * sin_theta;
+        float b1 = a * sin_theta + b * cos_theta;
+        v[pair_id] = __float2bfloat16(a1);
+        v[pair_id + half_dim] = __float2bfloat16(b1);
     }
 }
 
@@ -93,6 +103,12 @@ void rope_kernel_cu(
     CHECK(!sin_cache.is_empty());
     CHECK(!cos_cache.is_empty());
 
+    CHECK(query.data_type() == base::DataType::DataTypeBf16);
+    CHECK(key.data_type() == base::DataType::DataTypeBf16);
+    CHECK(token_pos.data_type() == base::DataType::DataTypeInt32);
+    CHECK(sin_cache.data_type() == base::DataType::DataTypeFp32);
+    CHECK(cos_cache.data_type() == base::DataType::DataTypeFp32);
+
     CHECK(query.device_type() == base::DeviceType::DeviceCUDA);
     CHECK(key.device_type() == base::DeviceType::DeviceCUDA);
     CHECK(token_pos.device_type() == base::DeviceType::DeviceCPU);
@@ -101,8 +117,8 @@ void rope_kernel_cu(
     
     CHECK(head_dim % 2 == 0);
 
-    float* q = const_cast<float*>(query.ptr<float>());
-    float* k = const_cast<float*>(key.ptr<float>());
+    __nv_bfloat16* q = reinterpret_cast<__nv_bfloat16*>(const_cast<uint16_t*>(query.ptr<uint16_t>()));
+    __nv_bfloat16* k = reinterpret_cast<__nv_bfloat16*>(const_cast<uint16_t*>(key.ptr<uint16_t>()));
     const int32_t pos = token_pos.index<int32_t>(0);
     const float* sptr = sin_cache.ptr<float>(pos * head_dim / 2); // sptr 索引到第 pos 行
     const float* cptr = cos_cache.ptr<float>(pos * head_dim / 2); // cptr 索引到第 pos 行

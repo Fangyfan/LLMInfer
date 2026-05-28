@@ -45,7 +45,7 @@ using GEMVKernel = void (*)(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 
     const tensor::Tensor& output, 
-    float scale, 
+    bool lm_head, 
     void* stream
 );
 GEMVKernel get_gemv_kernel(base::DeviceType device_type);

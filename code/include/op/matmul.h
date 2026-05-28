@@ -9,7 +9,7 @@ namespace op {
 // 计算公式为: 矩阵-向量乘法 y = wx + b
 class MatmulLayer : public LayerParam {
 public:
-    explicit MatmulLayer(base::DeviceType device_type, int32_t dim0, int32_t dim1, bool fuse_add = false, bool is_quant_layer = false);
+    explicit MatmulLayer(base::DeviceType device_type, int32_t dim0, int32_t dim1, bool lm_head = false, bool fuse_add = false, bool is_quant_layer = false);
     
     base::Status check() const override;
     
@@ -18,6 +18,7 @@ public:
 private:
     int32_t dim0_ = 0;      // 权重矩阵 w 的第 1 个维度
     int32_t dim1_ = 0;      // 权重矩阵 w 的第 2 个维度
+    bool lm_head_ = false;  // 是否为 lm_head linear layer
     bool fuse_add_ = false; // 是否与 add 融合，即 GEMV + Add (dim0)
 };
 }  // namespace op

@@ -5,7 +5,7 @@
 #include <cstddef>
 
 namespace model {
-// 非量化模型使用 RawModelDataFp32，量化模型使用 RawModelDataInt8
+// 非量化模型使用 RawModelData Bf16 / Fp32，量化模型使用 RawModelDataInt8
 struct RawModelData {
     ~RawModelData();
     int32_t fd = -1; // 文件描述符，用于内存映射系统调用
@@ -13,8 +13,12 @@ struct RawModelData {
     void* data = nullptr; // 整个文件映射到内存的起始地址
     void* weight_data = nullptr; // 权重数据在内存中的起始地址
 
-    // 第 offset 个权重数据 (fp32 / int8) 在内存中地址
+    // 第 offset 个权重数据 (bf16 / fp32 / int8) 在内存中地址
     virtual const void* weight_ptr(size_t offset) const = 0;
+};
+
+struct RawModelDataBf16 : RawModelData {
+    const void* weight_ptr(size_t offset) const override;
 };
 
 struct RawModelDataFp32 : RawModelData {

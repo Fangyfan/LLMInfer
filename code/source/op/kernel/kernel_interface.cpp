@@ -19,6 +19,7 @@
 #include "cuda/rope_kernel.cuh"
 #include "cuda/mha_kernel.cuh"
 #include "cuda/argmax_kernel.cuh"
+#include "cuda/softmax_kernel.cuh"
 
 namespace kernel {
 AddKernel get_add_kernel(base::DeviceType device_type) {
@@ -64,8 +65,6 @@ RMSNorm2DKernel get_rmsnorm_2d_kernel(base::DeviceType device_type) {
 GEMVKernel get_gemv_kernel(base::DeviceType device_type) {
     if (device_type == base::DeviceType::DeviceCUDA) {
         return gemv_kernel_cu;
-    } else if (device_type == base::DeviceType::DeviceCPU) {
-        return matmul_kernel_cpu;
     } else {
         LOG(FATAL) << "Unknown device type for get a matmul kernel." << std::endl;
         return nullptr;

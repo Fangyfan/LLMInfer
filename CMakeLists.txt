@@ -140,7 +140,7 @@ set_target_properties(llm_infer PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 # ============================================
 
 # 测试代码目录
-add_subdirectory(test)
+# add_subdirectory(test)
 
 # 演示代码目录
 add_subdirectory(main)

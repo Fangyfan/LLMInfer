@@ -20,7 +20,7 @@ static inline void sync_cuda() {
 }
 
 template <typename Model>
-int32_t generate(const Model& model, const std::string& sentence, int total_steps, double& TTFT, double& TPOT, bool need_output = false) {
+std::pair<int32_t, int32_t> generate(const Model& model, const std::string& sentence, int total_steps, double& TTFT, double& TPOT, bool need_output = false) {
     using Clock = std::chrono::steady_clock;
 
     TTFT = 0.0;
@@ -29,7 +29,7 @@ int32_t generate(const Model& model, const std::string& sentence, int total_step
     std::vector<int32_t> input_token_ids = model.encode(sentence);
     LOG_IF(FATAL, input_token_ids.empty()) << "input token ids is empty!" << std::endl;
 
-    const int32_t prompt_len = static_cast<int32_t>(input_token_ids.size());
+    const int32_t prompt_token_count = static_cast<int32_t>(input_token_ids.size());
 
     const op::EmbeddingResult& prompt_embedding_result = model.embedding(input_token_ids);
 
@@ -58,7 +58,7 @@ int32_t generate(const Model& model, const std::string& sentence, int total_step
     while (pos < total_steps) {
         token_pos.index<int32_t>(0) = pos;
 
-        if (pos < prompt_len - 1) {
+        if (pos < prompt_token_count - 1) {
             // Prefill 阶段：处理 prompt。
             // 不要每一步都 sync，否则会人为拉高 TTFT。
             const tensor::Tensor& token_embedding = model.get_embedding(token_pos, prompt_embedding_result, is_prompt);
@@ -116,7 +116,7 @@ int32_t generate(const Model& model, const std::string& sentence, int total_step
     }
 
     // 返回生成阶段 token 数更适合算 decode 性能。
-    return decode_token_count;
+    return std::make_pair(prompt_token_count, decode_token_count);
 }
 
 std::string fill_template(const std::string& prompt) {
@@ -173,7 +173,7 @@ int main(int argc, char* argv[]) {
     sync_cuda();
     auto start = std::chrono::steady_clock::now();
 
-    int32_t decode_tokens = generate<ModelType>(model, sentence, total_steps, TTFT, TPOT, true);
+    auto [prompt_tokens, decode_tokens] = generate<ModelType>(model, sentence, total_steps, TTFT, TPOT, true);
 
     sync_cuda();
     auto end = std::chrono::steady_clock::now();
@@ -181,6 +181,7 @@ int main(int argc, char* argv[]) {
     double duration = std::chrono::duration<double>(end - start).count();
 
     std::cout << "\n--------------- Performance Metrics ---------------" << std::endl;
+    std::cout << "prompt_tokens: " << prompt_tokens << std::endl;
     std::cout << "decode_tokens: " << decode_tokens << std::endl;
     std::cout << "time(s): " << duration << std::endl;
     if (duration > 0.0) {
