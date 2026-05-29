@@ -11,6 +11,14 @@ set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
 # 项目定义
 project(llm_infer CXX CUDA)
 
+# 默认 Release 构建，避免无优化编译
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+# 把 CUDA 架构固定成 RTX 4090 的 Ada Lovelace sm89
+set(CMAKE_CUDA_ARCHITECTURES 89)
+
 # 包含CUDA相关配置
 include(cmake/cuda.cmake)
 
@@ -26,11 +34,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # 设置CUDA标准
-set(CMAKE_CUDA_STANDARD 14)
+set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-
-# 启用 O2 优化
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 
 # ============================================
 # 项目特性选项
@@ -46,26 +51,19 @@ message(STATUS "启用 QWEN3 支持")
 find_package(GTest REQUIRED)
 find_package(glog REQUIRED)
 find_package(Armadillo REQUIRED)
+find_package(CUDAToolkit REQUIRED)
 
 # ============================================
 # 源代码收集
 # ============================================
 
-# Tensor相关源文件
 aux_source_directory(code/source/tensor/ DIR_TENSOR)
-# 基础模块源文件
 aux_source_directory(code/source/base/ DIR_BASE)
-# 操作符相关源文件
 aux_source_directory(code/source/op/ DIR_OP)
-# 模型相关源文件
 aux_source_directory(code/source/model/ DIR_MODEL)
-# CPU内核源文件
 aux_source_directory(code/source/op/kernel/cpu DIR_KERNEL_CPU)
-# CUDA内核源文件
 aux_source_directory(code/source/op/kernel/cuda DIR_KERNEL_CUDA)
-# 通用内核源文件
 aux_source_directory(code/source/op/kernel/ DIR_KERNEL)
-# 采样器源文件
 aux_source_directory(code/source/sampler DIR_SAMPLE)
 
 # ============================================
@@ -90,6 +88,31 @@ add_library(llm_infer SHARED
     ${DIR_SAMPLE}
 )
 
+target_compile_options(llm_infer PRIVATE
+    $<$<COMPILE_LANGUAGE:CXX>:
+        -O3
+        -DNDEBUG
+        -march=native
+        -mtune=native
+        -fno-math-errno
+    >
+    $<$<COMPILE_LANGUAGE:CUDA>:
+        -O3
+        -DNDEBUG
+        --extra-device-vectorization
+        -Xptxas=-O3
+    >
+)
+
+# 可选：先不要默认打开，确认数值无问题后再启用
+option(LLM_USE_CUDA_FAST_MATH "Enable CUDA fast math for inference kernels" OFF)
+
+if(LLM_USE_CUDA_FAST_MATH)
+    target_compile_options(llm_infer PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>
+    )
+endif()
+
 # ============================================
 # 链接库依赖
 # ============================================
@@ -100,8 +123,8 @@ target_link_libraries(llm_infer
     gtest
     gtest_main
     pthread
-    cudart
     armadillo
+    CUDA::cudart
 )
 
 # 指定链接目录
@@ -121,6 +144,7 @@ target_include_directories(llm_infer PUBLIC
     ${glog_INCLUDE_DIR}
     ${Armadillo_INCLUDE_DIR}
     ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+    ${CUDAToolkit_INCLUDE_DIRS}
 )
 
 # CPM特定包含目录
