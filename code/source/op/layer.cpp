@@ -245,43 +245,78 @@ base::Status LayerParam::set_weight(int32_t idx, const tensor::Tensor& weight) {
     return base::error::success();
 }
 
+/*
+QKV Packed GEMV Layer:
+AutoAWQ GEMM / N-packed
+qweight: [K, N / 8]       int32
+qzeros:  [K / 128, N / 8] int32
+scales:  [K / 128, N]     fp16
+
+model.layers.0.self_attn.q_proj.qweight torch.Size([2560, 512]) torch.int32
+model.layers.0.self_attn.k_proj.qweight torch.Size([2560, 128]) torch.int32
+model.layers.0.self_attn.v_proj.qweight torch.Size([2560, 128]) torch.int32
+
+model.layers.0.self_attn.q_proj.qzeros torch.Size([20, 512]) torch.int32
+model.layers.0.self_attn.k_proj.qzeros torch.Size([20, 128]) torch.int32
+model.layers.0.self_attn.v_proj.qzeros torch.Size([20, 128]) torch.int32
+
+model.layers.0.self_attn.q_proj.scales torch.Size([20, 4096]) torch.float16
+model.layers.0.self_attn.k_proj.scales torch.Size([20, 1024]) torch.float16
+model.layers.0.self_attn.v_proj.scales torch.Size([20, 1024]) torch.float16
+*/
 base::Status LayerParam::set_weight(int32_t idx, const std::vector<int32_t>& dims, const void* weight_ptr, base::DeviceType device_type) {
     CHECK_GE(idx, 0);
     CHECK_LT(idx, weights_.size());
     CHECK_NE(weight_ptr, nullptr);
 
     if (!is_quant_layer_) {
-        // 创建 Bf16 类型的 Tensor 权重参数，同时创建 Buffer 使用 weight_ptr 所指向的外部内存/显存
+        // 创建 BF16 类型的 Tensor 权重参数，同时创建 Buffer 使用 weight_ptr 所指向的外部内存/显存
         tensor::Tensor weight(base::DataType::DataTypeBf16, dims, false, nullptr, const_cast<void*>(weight_ptr));
         weight.set_device_type(device_type); // 当没有 allocator 来构造 buffer 时，需要手动设置 device_type
         weights_.at(idx) = weight;
     } else {
-        // 创建 Int8 类型的 Tensor 权重参数，同时创建 Buffer 使用 weight_ptr 所指向的外部内存/显存
-        tensor::Tensor weight(base::DataType::DataTypeInt8, dims, false, nullptr, const_cast<void*>(weight_ptr));
-        weight.set_device_type(device_type); // 当没有 allocator 来构造 buffer 时，需要手动设置 device_type
+        // 创建 Int4 类型 (用 1 个 int32 打包 8 个 int4) 的 Tensor 权重参数，同时创建 Buffer 使用 weight_ptr 所指向的外部内存/显存
+        tensor::Tensor weight(base::DataType::DataTypeInt4x8, dims, false, nullptr, const_cast<void*>(weight_ptr));
+        weight.set_device_type(device_type);
         weights_.at(idx) = weight;
-        
-        const int32_t weight_size = static_cast<int32_t>(weight.size());
-        CHECK(weight_size % group_size_ == 0);
-        int32_t scales_size = weight_size / group_size_; // 缩放因子 scales 张量的大小
-        float* scales_ptr = reinterpret_cast<float*>(static_cast<int8_t*>(const_cast<void*>(weight_ptr)) + weight_size);
 
-        // 创建 Fp32 类型的 Tensor 缩放因子，同时创建 Buffer 使用 scales_ptr 所指向的外部内存/显存
-        scales_ = tensor::Tensor(base::DataType::DataTypeFp32, scales_size, false, nullptr, scales_ptr);
-        scales_.set_device_type(device_type); // 当没有 allocator 来构造 buffer 时，需要手动设置 device_type
+        const int32_t weight_int32_size = static_cast<int32_t>(weight.size()); // INT32 元素个数 = INT4 元素个数 / 8
+        CHECK(group_size_ == 128);
+        CHECK(8 * weight_int32_size % group_size_ == 0);
+
+        int32_t zeros_int32_size = weight_int32_size / group_size_; // 零点 zeros 张量的大小
+        int32_t* zeros_ptr = static_cast<int32_t*>(const_cast<void*>(weight_ptr)) + weight_int32_size;
+        zeros_ = tensor::Tensor(base::DataType::DataTypeInt4x8, zeros_int32_size, false, nullptr, zeros_ptr);
+        zeros_.set_device_type(device_type);
+        
+        int32_t scales_fp16_size = 8 * zeros_int32_size; // 缩放因子 scales 张量的大小
+        uint16_t* scales_ptr = reinterpret_cast<uint16_t*>(zeros_ptr + zeros_int32_size);
+        scales_ = tensor::Tensor(base::DataType::DataTypeFp16, scales_fp16_size, false, nullptr, scales_ptr);
+        scales_.set_device_type(device_type);
     }
 
     return base::error::success();
 }
 
+void LayerParam::set_zeros(const tensor::Tensor& zeros) {
+    CHECK(!zeros.is_empty());
+    CHECK(zeros.data_type() == base::DataType::DataTypeInt4x8);
+    zeros_ = zeros;
+}
+
 void LayerParam::set_scales(const tensor::Tensor& scales) {
     CHECK(!scales.is_empty());
-    CHECK(scales.data_type() == base::DataType::DataTypeFp32);
+    CHECK(scales.data_type() == base::DataType::DataTypeFp16);
     scales_ = scales;
 }
 
 void LayerParam::set_group_size(int32_t group_size) {
     group_size_ = group_size;
+}
+
+int32_t LayerParam::get_zeros_size() const {
+    CHECK(!zeros_.is_empty());
+    return static_cast<int32_t>(zeros_.size());
 }
 
 int32_t LayerParam::get_scales_size() const {
@@ -296,8 +331,13 @@ void LayerParam::to_cuda() {
             weight.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
         }
     }
-    if (is_quant_layer_ && !scales_.is_empty()) {
-        scales_.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
+    if (is_quant_layer_) {
+        if (!zeros_.is_empty()) {
+            zeros_.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
+        }
+        if (!scales_.is_empty()) {
+            scales_.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
+        }
     }
 }
 }  // namespace op

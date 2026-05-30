@@ -80,6 +80,15 @@ FusedGEMVAddKernel get_fused_gemv_add_kernel(base::DeviceType device_type) {
     }
 }
 
+FusedGEMVAddInt4Kernel get_fused_gemv_add_int4_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
+        return fused_gemv_add_int4_kernel_cu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a fused_gemv_add_int4 kernel." << std::endl;
+        return nullptr;
+    }
+}
+
 FusedQKVGEMVKernel get_fused_qkv_gemv_kernel(base::DeviceType device_type) {
     if (device_type == base::DeviceType::DeviceCUDA) {
         return fused_qkv_gemv_kernel_cu;
@@ -89,11 +98,29 @@ FusedQKVGEMVKernel get_fused_qkv_gemv_kernel(base::DeviceType device_type) {
     }
 }
 
-GEMVInt8Kernel get_gemv_int8_kernel(base::DeviceType device_type) {
+FusedQKVGEMVInt4Kernel get_fused_qkv_gemv_int4_kernel(base::DeviceType device_type) {
     if (device_type == base::DeviceType::DeviceCUDA) {
-        return gemv_int8_kernel_cu;
+        return fused_qkv_gemv_int4_kernel_cu;
     } else {
-        LOG(FATAL) << "Unknown device type for get a gemv_int8 kernel." << std::endl;
+        LOG(FATAL) << "Unknown device type for get a fused_qkv_gemv kernel." << std::endl;
+        return nullptr;
+    }
+}
+
+FusedGateUpSwiGLUKernel get_fused_gate_up_gemv_swiglu_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
+        return fused_gate_up_gemv_swiglu_kernel_cu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a fused_gate_up_gemv_swiglu kernel." << std::endl;
+        return nullptr;
+    }
+}
+
+FusedGateUpSwiGLUInt4Kernel get_fused_gate_up_gemv_swiglu_int4_kernel(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::DeviceCUDA) {
+        return fused_gate_up_gemv_swiglu_int4_kernel_cu;
+    } else {
+        LOG(FATAL) << "Unknown device type for get a fused_gate_up_gemv_swiglu kernel." << std::endl;
         return nullptr;
     }
 }
@@ -105,15 +132,6 @@ SwigluKernel get_swiglu_kernel(base::DeviceType device_type) {
         return swiglu_kernel_cpu;
     } else {
         LOG(FATAL) << "Unknown device type for get a swiglu kernel." << std::endl;
-        return nullptr;
-    }
-}
-
-FusedGateUpSwiGLUKernel get_fused_gate_up_gemv_swiglu_kernel(base::DeviceType device_type) {
-    if (device_type == base::DeviceType::DeviceCUDA) {
-        return fused_gate_up_gemv_swiglu_kernel_cu;
-    } else {
-        LOG(FATAL) << "Unknown device type for get a fused_gate_up_gemv_swiglu kernel." << std::endl;
         return nullptr;
     }
 }

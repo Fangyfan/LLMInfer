@@ -350,9 +350,12 @@ void Qwen3Model::create_param_layers() {
     // 10. Output Head : [vocab_size, hidden_dim]
     qwen3_layers_->cls_layer_ = std::make_unique<op::MatmulLayer>(device_type_, vocab_size, hidden_dim, true); // lm_head = true
     qwen3_layers_->cls_layer_->set_weight(0, {vocab_size, hidden_dim}, raw_model_data_->weight_ptr(0), base::DeviceType::DeviceCPU);
+
+    size_t consumed_bytes = sizeof(ModelConfig) + offset * sizeof(uint16_t);
+    CHECK_EQ(consumed_bytes, raw_model_data_->file_size);
 }
 
-void Qwen3Model::create_param_quant_layers() {}
+void Qwen3Model::create_param_awq_int4_layers() {}
 
 void Qwen3Model::allocate_model_buffers() {
     // 1. 分配器选择: 根据配置决定是用 CPU 内存（malloc）还是 GPU 显存（cudaMalloc）

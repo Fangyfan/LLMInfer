@@ -13,7 +13,7 @@ struct RawModelData {
     void* data = nullptr; // 整个文件映射到内存的起始地址
     void* weight_data = nullptr; // 权重数据在内存中的起始地址
 
-    // 第 offset 个权重数据 (bf16 / fp32 / int8) 在内存中地址
+    // 第 offset 个权重数据 (bf16 / fp32 / int4 x 8 / int8) 在内存中地址
     virtual const void* weight_ptr(size_t offset) const = 0;
 };
 
@@ -22,6 +22,10 @@ struct RawModelDataBf16 : RawModelData {
 };
 
 struct RawModelDataFp32 : RawModelData {
+    const void* weight_ptr(size_t offset) const override;
+};
+
+struct RawModelDataInt32 : RawModelData {
     const void* weight_ptr(size_t offset) const override;
 };
 

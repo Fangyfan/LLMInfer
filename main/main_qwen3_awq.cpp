@@ -138,9 +138,7 @@ int main(int argc, char* argv[]) {
     const char* checkpoint_path = argv[1];
     const char* tokenizer_path = argv[2];
 
-    bool is_quant_model = false;
-
-    // using ModelType = model::Qwen3Model;
+    bool is_quant_model = true;
     using ModelType = model::Qwen3FusedModel;
 
     ModelType model(base::TokenizerType::EncodeBpe, tokenizer_path, checkpoint_path, is_quant_model);

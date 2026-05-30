@@ -9,7 +9,8 @@ namespace op {
 // 计算公式为: 矩阵-向量乘法 y = wx + b
 class MatmulLayer : public LayerParam {
 public:
-    explicit MatmulLayer(base::DeviceType device_type, int32_t dim0, int32_t dim1, bool lm_head = false, bool fuse_add = false, bool is_quant_layer = false);
+    explicit MatmulLayer(base::DeviceType device_type, int32_t dim0, int32_t dim1, 
+        bool lm_head = false, bool fuse_add = false, bool is_quant_layer = false);
     
     base::Status check() const override;
     

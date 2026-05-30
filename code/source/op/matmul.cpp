@@ -21,22 +21,32 @@ base::Status MatmulLayer::check() const {
             LOG(ERROR) << "The weight tensor error in the matmul layer." << std::endl;
             return status;
         }
+        status = check_tensor_with_dim(get_output(0), device_type_, !lm_head_ ? data_type_ : base::DataType::DataTypeFp32, dim0_);
+        if (!status) {
+            LOG(ERROR) << "The output tensor error in the matmul layer." << std::endl;
+            return status;
+        }
     } else {
-        status = check_tensor_with_dim(get_weight(0), device_type_, base::DataType::DataTypeInt8, dim0_, dim1_);
+        status = check_tensor_with_dim(get_weight(0), device_type_, base::DataType::DataTypeInt4x8, dim0_, dim1_);
         if (!status) {
-            LOG(ERROR) << "The weight tensor error in the matmul layer." << std::endl;
+            LOG(ERROR) << "The weight tensor error in the awq int4 matmul layer." << std::endl;
             return status;
         }
-        status = check_tensor_with_dim(scales_, device_type_, base::DataType::DataTypeFp32, scales_.size());
+        status = check_tensor_with_dim(zeros_, device_type_, base::DataType::DataTypeInt4x8, dim0_ * dim1_ / 128);
         if (!status) {
-            LOG(ERROR) << "The scales tensor error in the matmul layer." << std::endl;
+            LOG(ERROR) << "The zeros tensor error in the awq int4 matmul layer." << std::endl;
             return status;
         }
-    }
-    status = check_tensor_with_dim(get_output(0), device_type_, !lm_head_ ? data_type_ : base::DataType::DataTypeFp32, dim0_);
-    if (!status) {
-        LOG(ERROR) << "The output tensor error in the matmul layer." << std::endl;
-        return status;
+        status = check_tensor_with_dim(scales_, device_type_, base::DataType::DataTypeFp16, 8 * dim0_ * dim1_ / 128);
+        if (!status) {
+            LOG(ERROR) << "The scales tensor error in the awq int4 matmul layer." << std::endl;
+            return status;
+        }
+        status = check_tensor_with_dim(get_output(0), device_type_, !lm_head_ ? data_type_ : base::DataType::DataTypeFp32, 8 * dim0_);
+        if (!status) {
+            LOG(ERROR) << "The output tensor error in the awq int4 matmul layer." << std::endl;
+            return status;
+        }
     }
     return base::error::success();
 }
@@ -52,17 +62,20 @@ base::Status MatmulLayer::forward() {
     if (device_type_ == base::DeviceType::DeviceCUDA) {
         CHECK_NE(cuda_config_, nullptr);
     }
-    CHECK(!is_quant_layer_);
-    if (!fuse_add_) {
-        kernel::get_gemv_kernel(device_type_)(input, weight, output, lm_head_, cuda_config_ ? cuda_config_->stream : nullptr);
+    if (!is_quant_layer_) {
+        if (!fuse_add_) {
+            kernel::get_gemv_kernel(device_type_)(input, weight, output, lm_head_, cuda_config_ ? cuda_config_->stream : nullptr);
+        } else {
+            kernel::get_fused_gemv_add_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream : nullptr);
+        }
     } else {
-        kernel::get_fused_gemv_add_kernel(device_type_)(input, weight, output, cuda_config_ ? cuda_config_->stream : nullptr);
+        if (!fuse_add_) {
+            CHECK(lm_head_);
+            kernel::get_gemv_kernel(device_type_)(input, weight, output, lm_head_, cuda_config_ ? cuda_config_->stream : nullptr);
+        } else {
+            kernel::get_fused_gemv_add_int4_kernel(device_type_)(input, weight, output, zeros_, scales_, group_size_, cuda_config_->stream);
+        }
     }
-    // if (!is_quant_layer_) {
-    // } else {
-    //     CHECK(device_type_ == base::DeviceType::DeviceCUDA);
-    //     kernel::get_gemv_int8_kernel(device_type_)(input, weight, output, scales_, group_size_, cuda_config_->stream);
-    // }
     return base::error::success();
 }
 

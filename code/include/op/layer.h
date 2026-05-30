@@ -138,17 +138,21 @@ public:
     // 用途：从模型文件加载权重，比如 从磁盘读取 权重数据 到内存指针 weight_ptr，指定张量维度 dims，就能直接 初始化 权重张量 并存入 weights_
     base::Status set_weight(int32_t idx, const std::vector<int32_t>& dims, const void* weight_ptr, base::DeviceType device_type) override;
     
+    // AWQ INT4 量化推理
+    void set_zeros(const tensor::Tensor& zeros);
     void set_scales(const tensor::Tensor& scales);
     void set_group_size(int32_t group_size);
-    int32_t get_scales_size() const; // 获取 scales 张量的大小 (元素个数)
+    int32_t get_zeros_size() const; // 获取 zeros 张量的大小 (INT32 元素个数 = INT4 元素个数 / 8)
+    int32_t get_scales_size() const; // 获取 scales 张量的大小 (FP16 元素个数)
 
     void to_cuda() override; // 重写 Layer 的 to_cuda 函数，把层的所有数据转移到 cuda
 
 protected:
-    bool is_quant_layer_ = false;           // 标记是否为: 量化层
-    int32_t group_size_ = 0;                // 分组量化: 每次取连续的 group_size_ 个权重参数进行 Int8 对称量化，共享 1 个 scale 系数
-    tensor::Tensor scales_;                 // 缩放因子张量 (x_{fp32} = x_{int8} * scale) 
-    std::vector<tensor::Tensor> weights_;   // 算子中的所有权重（可能有多个，比如 Linear 层需要 2 个权重 W 和 b）
+    bool is_quant_layer_ = false;           // 标记是否为: AWQ INT4 量化层
+    int32_t group_size_ = 0;                // 分组量化: 每次取连续的 group_size_ 个权重参数 INT4 非对称量化，共享 1 个 scale + zero
+    tensor::Tensor zeros_;                  // 零点张量 x_{bf16} = (q_{int4} - zero) * scale，其类型是 INT32 = INT4 * 8
+    tensor::Tensor scales_;                 // 缩放因子张量 x_{bf16} = (q_{int4} - zero) * scale，其类型是 FP16
+    std::vector<tensor::Tensor> weights_;   // 非量化权重 BF16 / AWQ INT4 量化权重类型 INT32 = INT4 * 8
 };
 }  // namespace op
 

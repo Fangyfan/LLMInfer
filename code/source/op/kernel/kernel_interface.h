@@ -58,6 +58,17 @@ using FusedGEMVAddKernel = void (*)(
 );
 FusedGEMVAddKernel get_fused_gemv_add_kernel(base::DeviceType device_type);
 
+using FusedGEMVAddInt4Kernel = void (*)(
+    const tensor::Tensor& input, 
+    const tensor::Tensor& weight, 
+    const tensor::Tensor& output, 
+    const tensor::Tensor& zeros, 
+    const tensor::Tensor& scales, 
+    int32_t group_size, 
+    void* stream
+);
+FusedGEMVAddInt4Kernel get_fused_gemv_add_int4_kernel(base::DeviceType device_type);
+
 using FusedQKVGEMVKernel = void (*)(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 
@@ -68,23 +79,18 @@ using FusedQKVGEMVKernel = void (*)(
 );
 FusedQKVGEMVKernel get_fused_qkv_gemv_kernel(base::DeviceType device_type);
 
-using GEMVInt8Kernel = void (*)(
+using FusedQKVGEMVInt4Kernel = void (*)(
     const tensor::Tensor& input, 
     const tensor::Tensor& weight, 
-    const tensor::Tensor& output, 
+    const tensor::Tensor& query, 
+    const tensor::Tensor& key, 
+    const tensor::Tensor& value, 
+    const tensor::Tensor& zeros, 
     const tensor::Tensor& scales, 
     int32_t group_size, 
     void* stream
 );
-GEMVInt8Kernel get_gemv_int8_kernel(base::DeviceType device_type);
-
-using SwigluKernel = void (*)(
-    const tensor::Tensor& input1, 
-    const tensor::Tensor& input2, 
-    const tensor::Tensor& output, 
-    void* stream
-);
-SwigluKernel get_swiglu_kernel(base::DeviceType device_type);
+FusedQKVGEMVInt4Kernel get_fused_qkv_gemv_int4_kernel(base::DeviceType device_type);
 
 using FusedGateUpSwiGLUKernel = void (*)(
     const tensor::Tensor& input, 
@@ -94,6 +100,26 @@ using FusedGateUpSwiGLUKernel = void (*)(
     void* stream
 );
 FusedGateUpSwiGLUKernel get_fused_gate_up_gemv_swiglu_kernel(base::DeviceType device_type);
+
+using FusedGateUpSwiGLUInt4Kernel = void (*)(
+    const tensor::Tensor& input, 
+    const tensor::Tensor& weight, 
+    const tensor::Tensor& output, 
+    const tensor::Tensor& zeros, 
+    const tensor::Tensor& scales, 
+    int32_t group_size, 
+    int32_t immediate_dim, 
+    void* stream
+);
+FusedGateUpSwiGLUInt4Kernel get_fused_gate_up_gemv_swiglu_int4_kernel(base::DeviceType device_type);
+
+using SwigluKernel = void (*)(
+    const tensor::Tensor& input1, 
+    const tensor::Tensor& input2, 
+    const tensor::Tensor& output, 
+    void* stream
+);
+SwigluKernel get_swiglu_kernel(base::DeviceType device_type);
 
 using EmbeddingKernel = void (*)(
     const tensor::Tensor& input, 

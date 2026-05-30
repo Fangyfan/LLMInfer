@@ -9,7 +9,7 @@ namespace op {
 // 计算公式为: 矩阵-向量乘法 y = wx = row_concat(w_q * x, w_k * x, w_v * x)
 class QKVMatmulLayer : public LayerParam {
 public:
-    explicit QKVMatmulLayer(base::DeviceType device_type, int32_t dim, int32_t kv_dim, int32_t hidden_dim);
+    explicit QKVMatmulLayer(base::DeviceType device_type, int32_t dim, int32_t kv_dim, int32_t hidden_dim, bool is_quant_layer = false);
     
     base::Status check() const override;
     

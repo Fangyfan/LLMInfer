@@ -429,7 +429,7 @@ void mha_kernel_cu(
     //   s_S / s_P: [Bc] float32
     constexpr int32_t Bc = 32;
     const int32_t shared_size = (head_dim + 2 * Bc * head_dim) * sizeof(uint16_t) + (head_dim + 2 * Bc) * sizeof(float);
-    if (seq_len <= 128) {
+    if (seq_len <= 2048) {
         flashattention_gqa_kernel<thread_num, Bc><<<head_num, thread_num, shared_size, stream_>>>(
             query_ptr, key_cache_ptr, value_cache_ptr, output_ptr, layer_offset, seq_len, kv_dim, kv_mul, head_dim, scale
         );

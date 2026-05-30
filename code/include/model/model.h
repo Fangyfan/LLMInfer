@@ -53,11 +53,11 @@ private:
     virtual base::Status create_layers() = 0; // 总入口
     virtual void create_param_layers() = 0; // 创建带权重的层（Linear 层等）
     virtual void create_nonparam_layers() = 0; // 创建算子层（RoPE 层等）
-    virtual void create_param_quant_layers() = 0; // 如果是 Int8 量化模型，则调用此函数加载量化后的权重
+    virtual void create_param_awq_int4_layers() = 0; // 如果是 AWQ INT4 量化模型，则调用此函数加载量化后的权重
 
 protected:
-    int32_t group_size_ = 0; // 量化分组大小
-    bool is_quant_model_ = false; // 是否为量化模型
+    int32_t group_size_ = 0; // AWQ INT4 量化分组大小
+    bool is_quant_model_ = false; // 是否为 AWQ INT4 量化模型
     std::unique_ptr<TransformerConfig> config_; // 模型配置
 
     std::string tokenizer_path_; // tokenizer 文件路径

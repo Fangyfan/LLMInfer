@@ -24,6 +24,10 @@ const void* RawModelDataFp32::weight_ptr(size_t offset) const { // offset: 以 f
     return reinterpret_cast<float*>(weight_data) + offset;
 }
 
+const void* RawModelDataInt32::weight_ptr(size_t offset) const { // offset: 以 int32 元素为单位的索引
+    return reinterpret_cast<int32_t*>(weight_data) + offset;
+}
+
 const void* RawModelDataInt8::weight_ptr(size_t offset) const { // offset: 以 int8 元素为单位的索引
     return reinterpret_cast<int8_t*>(weight_data) + offset;
 }

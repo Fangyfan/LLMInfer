@@ -143,15 +143,10 @@ base::Status Model::read_model_file() {
         return base::error::path_not_valid("Failed to open the weight file " + model_path_ + ", may be the path does not exist!");
     }
 
-    // 2. 读取头信息：先 fread 读取 ModelConfig（配置头），如果是量化模型（is_quant_model_），还会读取 group_size
+    // 2. 读取头信息：先 fread 读取 ModelConfig（配置头）
     auto config = ModelConfig();
     if (fread(&config, sizeof(ModelConfig), 1, file) != 1) {
         return base::error::model_parse_error("Failed to retrieve the configuration information from the model file.");
-    }
-    if (is_quant_model_) {
-        if (fread(&group_size_, sizeof(int32_t), 1, file) != 1) {
-            return base::error::model_parse_error("Failed to retrieve the group size information from the model file.");
-        }
     }
 
     // 3. 生成配置：调用 generate_model_info 处理刚读到的配置
@@ -175,15 +170,11 @@ base::Status Model::read_model_file() {
     }
     
     // 5. 指针定位：计算权重数据在内存中的起始位置：weight_data = data (起始地址) + sizeof(ModelConfig) (跳过头信息)
-    if (!is_quant_model_) {
-        raw_model_data_ = std::make_unique<RawModelDataBf16>();
-    } else {
-        raw_model_data_ = std::make_unique<RawModelDataInt8>();
-    }
+    raw_model_data_ = std::make_unique<RawModelDataBf16>();
     raw_model_data_->data = data;
     raw_model_data_->fd = fd;
     raw_model_data_->file_size = file_size;
-    raw_model_data_->weight_data = static_cast<char*>(data) + sizeof(ModelConfig) + (is_quant_model_ ? sizeof(group_size_) : 0);
+    raw_model_data_->weight_data = static_cast<char*>(data) + sizeof(ModelConfig);
     return base::error::success();
 }
 

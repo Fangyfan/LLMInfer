@@ -62,9 +62,6 @@ base::Status Qwen3FusedModel::init(base::DeviceType device_type) {
     if (tokenizer_path_.empty()) {
         return base::error::path_not_valid(tokenizer_path_);
     }
-    if (is_quant_model_) {
-        return base::error::invalid_argument("Qwen3 do not support int8 quant model.");
-    }
     
     device_type_ = device_type;
     if (device_type_ == base::DeviceType::DeviceCUDA) {
@@ -165,7 +162,7 @@ base::Status Qwen3FusedModel::create_layers() {
     if (!is_quant_model_) {
         create_param_layers();
     } else {
-        return base::error::function_not_implement("");
+        create_param_awq_int4_layers();
     }
     
     // 4. 算子层数量和空指针检查
@@ -316,9 +313,142 @@ void Qwen3FusedModel::create_param_layers() {
     // 10. LM_Head : [vocab_size, hidden_dim] and tie_word_embedding = true
     qwen3_fused_layers_->lm_head_layer_ = std::make_unique<op::MatmulLayer>(device_type_, vocab_size, hidden_dim, true); // lm_head = true
     qwen3_fused_layers_->lm_head_layer_->set_weight(0, {vocab_size, hidden_dim}, raw_model_data_->weight_ptr(0), base::DeviceType::DeviceCPU);
+
+    size_t consumed_bytes = sizeof(ModelConfig) + offset * sizeof(uint16_t);
+    CHECK_EQ(consumed_bytes, raw_model_data_->file_size);
 }
 
-void Qwen3FusedModel::create_param_quant_layers() {}
+void Qwen3FusedModel::create_param_awq_int4_layers() {
+    CHECK(is_quant_model_);
+    CHECK(qwen3_fused_layers_ != nullptr);
+    
+    size_t offset = 0;
+    int32_t dim = config_->dim;
+    int32_t kv_dim = config_->kv_dim;
+    int32_t head_dim = config_->head_dim;
+    int32_t layer_num = config_->layer_num;
+    int32_t vocab_size = config_->vocab_size;
+    int32_t hidden_dim = config_->hidden_dim;
+    int32_t max_seq_len = config_->max_seq_len;
+    int32_t immediate_dim = config_->immediate_dim;
+    
+    // 1. Embedding : [vocab_size, hidden_dim]
+    qwen3_fused_layers_->embedding_layer_ = std::make_unique<op::EmbeddingLayer>(device_type_, hidden_dim, max_seq_len, vocab_size);
+    qwen3_fused_layers_->embedding_layer_->set_weight(0, {vocab_size, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+    offset += vocab_size * hidden_dim;
+
+    // 2. Pre_RMSNorm (rmsnorm) : [layers, hidden_dim]
+    for (int32_t i = 0; i < layer_num; ++i) {
+        auto pre_rmsnorm = std::make_unique<op::RMSNormLaryer>(device_type_, hidden_dim);
+        pre_rmsnorm->set_weight(0, {hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+        qwen3_fused_layers_->pre_rmsnorm_layers_.push_back(std::move(pre_rmsnorm));
+        offset += hidden_dim;
+    }
+
+    /*
+    3. AWQ INT4 Fused_QKV_Proj (w_qkv = w_q + w_k + w_v) : [
+        layers, [
+            qweight = [(dim + 2 * kv_dim) / 8, hidden_dim      ]    int4x8
+            qzeros  = [(dim + 2 * kv_dim) / 8, hidden_dim / 128]    int4x8
+            scales  = [(dim + 2 * kv_dim)    , hidden_dim / 128]    fp16
+        ]
+    ]
+    */
+    for (int32_t i = 0; i < layer_num; ++i) {
+        auto w_qkv = std::make_unique<op::QKVMatmulLayer>(device_type_, dim, kv_dim, hidden_dim, is_quant_model_);
+        w_qkv->set_group_size(128);
+        w_qkv->set_weight(0, {(dim + 2 * kv_dim) / 8, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+        qwen3_fused_layers_->fused_qkv_proj_layers_.push_back(std::move(w_qkv));
+        offset += (dim + 2 * kv_dim) * hidden_dim / 4;
+        offset += (dim + 2 * kv_dim) * hidden_dim / 512;
+        offset += (dim + 2 * kv_dim) * hidden_dim / 128;
+    }
+
+    // 4. Fused_QK_Norm_RoPE (qk_norm = q_norm + k_norm) : [layers, 2 * head_dim]
+    for (int32_t i = 0; i < layer_num; ++i) {
+        auto qk_norm = std::make_unique<op::QKNormRoPELaryer>(device_type_, dim, kv_dim, head_dim);
+        qk_norm->set_weight(0, {2 * head_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+        qwen3_fused_layers_->fused_qk_norm_rope_layers_.push_back(std::move(qk_norm));
+        offset += 2 * head_dim;
+    }
+
+    /*
+    5. AWQ INT4 Fused_O_Proj_Add (w_o) : [
+        layers, [
+            qweight = [hidden_dim / 8, dim      ]    int4x8
+            qzeros  = [hidden_dim / 8, dim / 128]    int4x8
+            scales  = [hidden_dim    , dim / 128]    fp16
+        ]
+    ]
+    */
+    for (int32_t i = 0; i < layer_num; ++i) {
+        auto w_o = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim / 8, dim, false, true, is_quant_model_); // fuse_add = true
+        w_o->set_group_size(128);
+        w_o->set_weight(0, {hidden_dim / 8, dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+        qwen3_fused_layers_->fused_o_proj_add_layers_.push_back(std::move(w_o));
+        offset += hidden_dim * dim / 4;
+        offset += hidden_dim * dim / 512;
+        offset += hidden_dim * dim / 128;
+    }
+
+    // 6. FFN_RMSNorm (rmsnorm) : [layers, hidden_dim]
+    for (int32_t i = 0; i < layer_num; ++i) {
+        auto ffn_rmsnorm = std::make_unique<op::RMSNormLaryer>(device_type_, hidden_dim);
+        ffn_rmsnorm->set_weight(0, {hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+        qwen3_fused_layers_->ffn_rmsnorm_layers_.push_back(std::move(ffn_rmsnorm));
+        offset += hidden_dim;
+    }
+
+    /*
+    7. AWQ INT4 Fused_Gate_Up_Swiglu (w_gate + w_up) : [
+        layers, [
+            qweight = [2 * immediate_dim / 8, hidden_dim      ]    int4x8
+            qzeros  = [2 * immediate_dim / 8, hidden_dim / 128]    int4x8
+            scales  = [2 * immediate_dim    , hidden_dim / 128]    fp16
+        ]
+    ]
+    */
+    for (int32_t i = 0; i < layer_num; ++i) {
+        auto w_gate_up = std::make_unique<op::GateUpSwigluLayer>(device_type_, immediate_dim, hidden_dim, is_quant_model_);
+        w_gate_up->set_group_size(128);
+        w_gate_up->set_weight(0, {2 * immediate_dim / 8, hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+        qwen3_fused_layers_->fused_gate_up_swiglu_layers_.push_back(std::move(w_gate_up));
+        offset += 2 * immediate_dim * hidden_dim / 4;
+        offset += 2 * immediate_dim * hidden_dim / 512;
+        offset += 2 * immediate_dim * hidden_dim / 128;
+    }
+
+    /*
+    8. AWQ INT4 Fused_Down_Add (w_down) : [
+        layers, [
+            qweight = [hidden_dim / 8, immediate_dim      ]    int4x8
+            qzeros  = [hidden_dim / 8, immediate_dim / 128]    int4x8
+            scales  = [hidden_dim    , immediate_dim / 128]    fp16
+        ]
+    ]
+    */
+    for (int32_t i = 0; i < layer_num; ++i) {
+        auto w_down = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim / 8, immediate_dim, false, true, is_quant_model_);
+        w_down->set_group_size(128);
+        w_down->set_weight(0, {hidden_dim / 8, immediate_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+        qwen3_fused_layers_->fused_down_proj_add_layers_.push_back(std::move(w_down));
+        offset += hidden_dim * immediate_dim / 4;
+        offset += hidden_dim * immediate_dim / 512;
+        offset += hidden_dim * immediate_dim / 128;
+    }
+
+    // 9. Final_RMSNorm : [hidden_dim]
+    qwen3_fused_layers_->final_rmsnorm_layer_ = std::make_unique<op::RMSNormLaryer>(device_type_, hidden_dim);
+    qwen3_fused_layers_->final_rmsnorm_layer_->set_weight(0, {hidden_dim}, raw_model_data_->weight_ptr(offset), base::DeviceType::DeviceCPU);
+    offset += hidden_dim;
+
+    // 10. LM_Head : [vocab_size, hidden_dim] and tie_word_embedding = true
+    qwen3_fused_layers_->lm_head_layer_ = std::make_unique<op::MatmulLayer>(device_type_, vocab_size, hidden_dim, true); // lm_head = true
+    qwen3_fused_layers_->lm_head_layer_->set_weight(0, {vocab_size, hidden_dim}, raw_model_data_->weight_ptr(0), base::DeviceType::DeviceCPU);
+
+    size_t consumed_bytes = sizeof(ModelConfig) + offset * sizeof(uint16_t);
+    CHECK_EQ(sizeof(ModelConfig) + offset * sizeof(uint16_t), raw_model_data_->file_size);
+}
 
 void Qwen3FusedModel::allocate_model_buffers() {
     auto allocator_cu = base::CUDADeviceAllocatorFactory::get_instance();

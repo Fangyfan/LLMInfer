@@ -9,7 +9,7 @@ namespace op {
 // 计算公式为: 矩阵-向量乘法 y = wx = row_concat(w_gate * x, w_up * x)
 class GateUpSwigluLayer : public LayerParam {
 public:
-    explicit GateUpSwigluLayer(base::DeviceType device_type, int32_t immediate_dim, int32_t hidden_dim);
+    explicit GateUpSwigluLayer(base::DeviceType device_type, int32_t immediate_dim, int32_t hidden_dim, bool is_quant_layer = false);
     
     base::Status check() const override;
     

@@ -49,11 +49,11 @@ private:
     // 创建无参数层: 把不需要训练参数的算子实例化
     void create_nonparam_layers() override;
     
-    // 创建非量化 Fp32 可学习参数层: 把需要训练参数的算子实例化
+    // 创建非量化 BF16 可学习参数层: 把需要训练参数的算子实例化
     void create_param_layers() override;
 
-    // 创建量化 Int8 可学习参数层: 把需要训练参数的算子实例化
-    void create_param_quant_layers() override;
+    // 创建 AWQ INT4 量化可学习参数层: 把需要训练参数的算子实例化
+    void create_param_awq_int4_layers() override;
 
     // 对输入数据做 RMSNorm、投影 QKV、缓存 KV、RoPE 旋转位置编码
     void rmsnorm_qkv_rope(int32_t layer_id, const tensor::Tensor& input, const tensor::Tensor& token_pos) const;

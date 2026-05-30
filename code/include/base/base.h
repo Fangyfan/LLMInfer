@@ -8,6 +8,12 @@
 // UNUSED 宏：显式标记未使用的参数，消除编译器警告
 #define UNUSED(expr) do { (void)(expr); } while (0)
 
+#define CUDA_CHECK(expr)                                                                    \
+    do {                                                                                    \
+        cudaError_t err = (expr);                                                           \
+        LOG_IF(FATAL, err != cudaSuccess) << "CUDA error: " << cudaGetErrorString(err);     \
+    } while (0)
+
 namespace model {
 enum class ModelBufferType : uint8_t {
     TokenIds = 0,           // 输入 token ids
@@ -45,8 +51,9 @@ enum class DataType : uint8_t {
     DataTypeUnknown = 0,
     DataTypeFp32 = 1,   // 单精度浮点 FP32
     DataTypeBf16 = 2,   // 半精度浮点 BF16
-    DataTypeInt32 = 3,  // 32 位整数
-    DataTypeInt8 = 4,   // 8 位整数（量化）
+    DataTypeFp16 = 3,   // 半精度浮点 FP16
+    DataTypeInt32 = 4,  // 32 位整数 INT32
+    DataTypeInt4x8 = 5, // 用 1 个 INT32 打包 8 个 INT4
 };
 
 enum class ModelType : uint8_t {
@@ -57,14 +64,10 @@ enum class ModelType : uint8_t {
 };
 
 inline size_t data_type_size(DataType data_type) {
-    if (data_type == DataType::DataTypeBf16) {
+    if (data_type == DataType::DataTypeBf16 || data_type == DataType::DataTypeFp16) {
         return sizeof(uint16_t);
-    } else if (data_type == DataType::DataTypeFp32) {
-        return sizeof(float);
-    } else if (data_type == DataType::DataTypeInt32) {
+    } else if (data_type == DataType::DataTypeFp32 || data_type == DataType::DataTypeInt32 || data_type == DataType::DataTypeInt4x8) {
         return sizeof(int32_t);
-    } else if (data_type == DataType::DataTypeInt8) {
-        return sizeof(int8_t);
     } else {
         LOG(FATAL) << "Unknown data type size for " << int(data_type) << std::endl;
         return 0;

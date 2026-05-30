@@ -55,8 +55,8 @@ private:
     // 创建非量化 Fp32 可学习参数层: 把需要训练参数的算子实例化
     void create_param_layers() override;
 
-    // 创建量化 Int8 可学习参数层: 把需要训练参数的算子实例化
-    void create_param_quant_layers() override;
+    // 创建 AWQ INT4 量化可学习参数层: 把需要训练参数的算子实例化
+    void create_param_awq_int4_layers() override;
 
     // 对输入数据做 RMSNorm: Qwen3 采用 Pre-Norm 结构。这意味着数据在进入注意力模块之前，必须先被归一化，这有助于数值稳定
     void attention_rmsnorm(int32_t layer_id, const tensor::Tensor& input) const;
