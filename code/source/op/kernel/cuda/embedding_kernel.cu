@@ -60,7 +60,7 @@ void embedding_kernel_cu(
     
     CHECK(hidden_dim % 8 == 0);
     dim3 gridDim(token_num);
-    dim3 blockDim(256);
+    dim3 blockDim(512);
     embedding_bf16x8_kernel<<<gridDim, blockDim, 0, stream_>>>(in, wei, out, hidden_dim);
     cudaStreamSynchronize(stream_);
 }

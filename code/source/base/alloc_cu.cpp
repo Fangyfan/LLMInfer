@@ -97,17 +97,17 @@ void CUDADeviceAllocator::release(void* ptr) {
         no_busy_bytes_count_ += it->byte_size; // 更新小块的空闲显存
         cuda_busy_buffers_.erase(it);
         // LOG(INFO) << "released: small reuse cuda" << cuda_id_ << " , ptr = " << ptr << std::endl;
-        constexpr size_t gbytes = 1024 * 1024 * 1024;
-        if (no_busy_bytes_count_ > gbytes) { // 当前 GPU 的小块空闲显存 > 1024MB
-            // LOG(INFO) << "released: free all small blocks cuda" << cuda_id_ << std::endl;
-            for (auto& buffer : cuda_no_busy_buffers_) {
-                data_iter_.erase(buffer.data);
-                cudaError_t err = cudaFree(buffer.data); // 调用 cudaFree 释放空闲显存
-                CHECK(err == cudaSuccess) << "Error: CUDA error when release memory on device " << cuda_id_ << std::endl;
-            }
-            cuda_no_busy_buffers_.clear(); // 清空小块空闲显存池
-            no_busy_bytes_count_ = 0; // 小块的空闲显存清零
-        }
+        // constexpr size_t gbytes = 1024 * 1024 * 1024;
+        // if (no_busy_bytes_count_ > gbytes) { // 当前 GPU 的小块空闲显存 > 1024MB
+        //     // LOG(INFO) << "released: free all small blocks cuda" << cuda_id_ << std::endl;
+        //     for (auto& buffer : cuda_no_busy_buffers_) {
+        //         data_iter_.erase(buffer.data);
+        //         cudaError_t err = cudaFree(buffer.data); // 调用 cudaFree 释放空闲显存
+        //         CHECK(err == cudaSuccess) << "Error: CUDA error when release memory on device " << cuda_id_ << std::endl;
+        //     }
+        //     cuda_no_busy_buffers_.clear(); // 清空小块空闲显存池
+        //     no_busy_bytes_count_ = 0; // 小块的空闲显存清零
+        // }
         return;
     }
 

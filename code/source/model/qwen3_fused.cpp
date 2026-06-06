@@ -65,7 +65,7 @@ base::Status Qwen3FusedModel::init(base::DeviceType device_type) {
     
     device_type_ = device_type;
     if (device_type_ == base::DeviceType::DeviceCUDA) {
-        if (cudaSetDevice(1) != cudaSuccess) {
+        if (cudaSetDevice(3) != cudaSuccess) {
             return base::error::internal_error("The cuda set device id failed.");
         }
         cuda_config_ = std::make_shared<kernel::CudaConfig>();

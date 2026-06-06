@@ -51,7 +51,7 @@ struct __align__(8) val_idx {
     int32_t idx;
 };
 
-template <int32_t BLOCK_DIM>
+template <int32_t SM_NUM, int32_t BLOCK_DIM>
 static __global__ __launch_bounds__(BLOCK_DIM) void argmax_kernel_1(
     const float* __restrict__ input,
     int32_t size,
@@ -59,14 +59,17 @@ static __global__ __launch_bounds__(BLOCK_DIM) void argmax_kernel_1(
 ) {
     constexpr int32_t WARP_NUM = BLOCK_DIM >> 5;
 
+    int32_t size4 = size >> 2;
+    const float4* __restrict__ input4 = reinterpret_cast<const float4*>(input);
+
     float val = -INFINITY;
     int32_t idx = -1;
-    for (int32_t i = blockIdx.x * blockDim.x + threadIdx.x; i < size; i += blockDim.x * gridDim.x) {
-        float other_val = input[i];
-        if (val < other_val) {
-            val = other_val;
-            idx = i;
-        }
+    for (int32_t i = blockIdx.x * blockDim.x + threadIdx.x; i < size4; i += SM_NUM * BLOCK_DIM) {
+        float4 other_val4 = input4[i];
+        if (val < other_val4.x) { val = other_val4.x; idx = (i << 2); }
+        if (val < other_val4.y) { val = other_val4.y; idx = (i << 2) + 1; }
+        if (val < other_val4.z) { val = other_val4.z; idx = (i << 2) + 2; }
+        if (val < other_val4.w) { val = other_val4.w; idx = (i << 2) + 3; }
     }
     block_reduce_argmax<WARP_NUM>(val, idx);
 
@@ -111,10 +114,12 @@ int32_t argmax_kernel_cu(
     int32_t* output_idx_cu_ptr = argmax_token;
     val_idx* temp = reinterpret_cast<val_idx*>(argmax_buffer);
 
-    dim3 gridDim(128);
-    dim3 blockDim(256);
+    constexpr int32_t SM_NUM = 128;
+    constexpr int32_t BLOCK_DIM = 512;
+    // dim3 gridDim(SM_NUM);
+    // dim3 blockDim(BLOCK_DIM);
     cudaStream_t stream_ = stream ? static_cast<cudaStream_t>(stream) : nullptr;
-    argmax_kernel_1<256><<<gridDim, blockDim, 0, stream_>>>(input, size, temp);
+    argmax_kernel_1<SM_NUM, BLOCK_DIM><<<SM_NUM, BLOCK_DIM, 0, stream_>>>(input, size, temp);
     argmax_kernel_2<<<1, 32, 0, stream_>>>(temp, output_idx_cu_ptr);
     if (stream_) {
         // 因为这里是异步 (Async) 调用，调用函数后会立马返回，所有 cuda 操作进入流任务队列，按照顺序执行
